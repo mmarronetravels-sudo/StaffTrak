@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Staff from './pages/Staff'
+import Rubrics from './pages/Rubrics'
 
 function App() {
   return (
@@ -30,6 +31,16 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
                 <Staff />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Admin/Evaluator only - rubrics */}
+          <Route 
+            path="/rubrics" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+                <Rubrics />
               </ProtectedRoute>
             } 
           />
