@@ -111,6 +111,19 @@ function Goals() {
     }
   }
 
+  const handleSubmitForApproval = async (goalId) => {
+  const { error } = await supabase
+    .from('goals')
+    .update({ status: 'submitted' })
+    .eq('id', goalId)
+
+  if (!error) {
+    setGoals(goals.map(g => 
+      g.id === goalId ? { ...g, status: 'submitted' } : g
+    ))
+  }
+}
+
   const handleLogout = async () => {
     await signOut()
     window.location.href = '/login'
@@ -268,6 +281,25 @@ function Goals() {
                           <p className="text-sm text-[#666666] bg-gray-50 p-3 rounded">{goal.professional_learning}</p>
                         </div>
                       )}
+                      {/* Evaluator Feedback (if returned for revision) */}
+{goal.evaluator_feedback && goal.status === 'draft' && (
+  <div className="bg-orange-50 border border-orange-200 p-3 rounded">
+    <h4 className="text-sm font-semibold text-[#f3843e] mb-1">⚠️ Revision Requested</h4>
+    <p className="text-sm text-[#666666]">{goal.evaluator_feedback}</p>
+  </div>
+)}
+
+{/* Submit Button for Draft Goals */}
+{goal.status === 'draft' && (
+  <div className="pt-4 border-t border-gray-200">
+    <button
+      onClick={() => handleSubmitForApproval(goal.id)}
+      className="w-full px-4 py-2 bg-[#2c3e7e] text-white rounded-lg hover:bg-[#1e2a5e]"
+    >
+      Submit for Approval
+    </button>
+  </div>
+)}
                     </div>
                   </div>
                 )}

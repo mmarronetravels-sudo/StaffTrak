@@ -6,17 +6,29 @@ import Dashboard from './pages/Dashboard'
 import Staff from './pages/Staff'
 import Rubrics from './pages/Rubrics'
 import Goals from './pages/Goals'
+import GoalApprovals from './pages/GoalApprovals'
+import Observations from './pages/Observations'
+import ObservationSession from './pages/ObservationSession'
+import MyObservations from './pages/MyObservations'
+import SelfReflection from './pages/SelfReflection'
+import Meetings from './pages/Meetings'
+import MyMeetings from './pages/MyMeetings'
+import MeetingSession from './pages/MeetingSession'
+import Summatives from './pages/Summatives'
+import SummativeEvaluation from './pages/SummativeEvaluation'
+import MySummative from './pages/MySummative'
+import Reports from './pages/Reports'
 
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public routes - anyone can see */}
+          {/* Public routes */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
 
-          {/* Protected routes - must be logged in */}
+          {/* Protected routes - all authenticated users */}
           <Route 
             path="/dashboard" 
             element={
@@ -26,7 +38,66 @@ function App() {
             } 
           />
 
-          {/* Admin/Evaluator only - staff management */}
+          {/* Goals - all users can view their own */}
+          <Route 
+            path="/goals" 
+            element={
+              <ProtectedRoute>
+                <Goals />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Self-Reflection - all authenticated users */}
+          <Route 
+            path="/self-reflection" 
+            element={
+              <ProtectedRoute>
+                <SelfReflection />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* My Observations - staff view */}
+          <Route 
+            path="/my-observations" 
+            element={
+              <ProtectedRoute>
+                <MyObservations />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* My Meetings - staff view */}
+          <Route 
+            path="/my-meetings" 
+            element={
+              <ProtectedRoute>
+                <MyMeetings />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/my-meetings/:id" 
+            element={
+              <ProtectedRoute>
+                <MeetingSession />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* My Summative - staff view */}
+          <Route 
+            path="/my-summative" 
+            element={
+              <ProtectedRoute>
+                <MySummative />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Admin/Evaluator routes */}
           <Route 
             path="/staff" 
             element={
@@ -36,7 +107,6 @@ function App() {
             } 
           />
 
-          {/* Admin/Evaluator only - rubrics */}
           <Route 
             path="/rubrics" 
             element={
@@ -46,12 +116,75 @@ function App() {
             } 
           />
 
-          {/* Goals - all logged in users */}
           <Route 
-            path="/goals" 
+            path="/goal-approvals" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+                <GoalApprovals />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/observations" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+                <Observations />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/observations/:id" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+                <ObservationSession />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/meetings" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+                <Meetings />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/meetings/:id" 
             element={
               <ProtectedRoute>
-                <Goals />
+                <MeetingSession />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/summatives" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+                <Summatives />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/summatives/:staffId" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+                <SummativeEvaluation />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Reports - Admin/Evaluator only */}
+          <Route 
+            path="/reports" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+                <Reports />
               </ProtectedRoute>
             } 
           />
