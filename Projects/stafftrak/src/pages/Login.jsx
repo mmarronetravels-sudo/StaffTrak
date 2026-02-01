@@ -1,16 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import { useAuth } from '../context/AuthContext'
 
 function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [isError, setIsError] = useState(false)
+  
+  const navigate = useNavigate()
+  const { user } = useAuth()
+
+  // If already logged in, redirect to dashboard
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard')
+    }
+  }, [user, navigate])
 
   const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
     setMessage('')
+    setIsError(false)
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -19,16 +33,18 @@ function Login() {
 
     if (error) {
       setMessage(error.message)
-    } else {
-      window.location.href = '/dashboard'
+      setIsError(true)
+      setLoading(false)
     }
-    setLoading(false)
+    // No need to redirect here - AuthContext will detect the login
+    // and the useEffect above will handle the redirect
   }
 
   const handleSignUp = async (e) => {
     e.preventDefault()
     setLoading(true)
     setMessage('')
+    setIsError(false)
 
     const { error } = await supabase.auth.signUp({
       email,
@@ -37,8 +53,10 @@ function Login() {
 
     if (error) {
       setMessage(error.message)
+      setIsError(true)
     } else {
       setMessage('Check your email for a confirmation link!')
+      setIsError(false)
     }
     setLoading(false)
   }
@@ -79,7 +97,11 @@ function Login() {
           </div>
 
           {message && (
-            <div className="mb-4 p-3 bg-[#477fc1]/10 text-[#2c3e7e] rounded-lg text-sm">
+            <div className={`mb-4 p-3 rounded-lg text-sm ${
+              isError 
+                ? 'bg-red-100 text-red-700' 
+                : 'bg-green-100 text-green-700'
+            }`}>
               {message}
             </div>
           )}
