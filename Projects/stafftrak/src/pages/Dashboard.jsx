@@ -1,36 +1,32 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import { useAuth } from '../context/AuthContext'
 
 function Dashboard() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { user, profile, signOut } = useAuth()
+  const [tenant, setTenant] = useState(null)
 
   useEffect(() => {
-    getUser()
-  }, [])
+    if (profile?.tenant_id) {
+      fetchTenant()
+    }
+  }, [profile])
 
-  const getUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    setUser(user)
-    setLoading(false)
+  const fetchTenant = async () => {
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('*')
+      .eq('id', profile.tenant_id)
+      .single()
+
+    if (!error) {
+      setTenant(data)
+    }
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await signOut()
     window.location.href = '/login'
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <p className="text-[#666666]">Loading...</p>
-      </div>
-    )
-  }
-
-  if (!user) {
-    window.location.href = '/login'
-    return null
   }
 
   return (
@@ -40,7 +36,7 @@ function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold text-white">StaffTrak</h1>
           <div className="flex items-center gap-4">
-            <span className="text-white">{user.email}</span>
+            <span className="text-white">{profile?.full_name || user?.email}</span>
             <button
               onClick={handleLogout}
               className="bg-white text-[#2c3e7e] px-4 py-2 rounded-lg hover:bg-gray-100"
@@ -53,7 +49,15 @@ function Dashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        <h2 className="text-2xl font-bold text-[#2c3e7e] mb-6">Dashboard</h2>
+        {/* Welcome Header */}
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-[#2c3e7e]">
+            Welcome, {profile?.full_name?.split(' ')[0] || 'there'}!
+          </h2>
+          {tenant && (
+            <p className="text-[#666666]">{tenant.name}</p>
+          )}
+        </div>
         
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
