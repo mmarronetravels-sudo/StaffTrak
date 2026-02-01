@@ -18,6 +18,8 @@ import Summatives from './pages/Summatives'
 import SummativeEvaluation from './pages/SummativeEvaluation'
 import MySummative from './pages/MySummative'
 import Reports from './pages/Reports'
+import StaffImport from './pages/StaffImport'
+import AuthCallback from './pages/AuthCallback'
 
 function App() {
   return (
@@ -27,6 +29,11 @@ function App() {
           {/* Public routes */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+
+          {/* Public routes */}
+<Route path="/" element={<Home />} />
+<Route path="/login" element={<Login />} />
+<Route path="/auth/callback" element={<AuthCallback />} />   {/* ADD THIS LINE */}
 
           {/* Protected routes - all authenticated users */}
           <Route 
@@ -96,6 +103,25 @@ function App() {
               </ProtectedRoute>
             } 
           />
+
+          <Route 
+  path="/staff" 
+  element={
+    <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+      <Staff />
+    </ProtectedRoute>
+  } 
+/>
+
+{/* ADD THIS BLOCK RIGHT HERE */}
+<Route 
+  path="/staff/import" 
+  element={
+    <ProtectedRoute allowedRoles={['district_admin', 'school_admin']}>
+      <StaffImport />
+    </ProtectedRoute>
+  } 
+/>
 
           {/* Admin/Evaluator routes */}
           <Route 

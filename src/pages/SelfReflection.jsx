@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import Navbar from '../components/Navbar'
 
 function SelfReflection() {
   const { profile, signOut } = useAuth()
@@ -218,6 +219,7 @@ function SelfReflection() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+        <Navbar />
       <nav className="bg-[#2c3e7e] shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-8">

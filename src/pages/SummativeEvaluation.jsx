@@ -2,6 +2,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { notifyEvaluationReady } from '../services/emailService'
 import { SummativePDFDownload } from '../components/SummativePDF'
 
 function SummativeEvaluation() {
@@ -249,6 +250,8 @@ function SummativeEvaluation() {
       evaluator_signature_at: new Date().toISOString()
     }
     
+    let success = false
+    
     if (evaluation?.id) {
       const { error } = await supabase
         .from('summative_evaluations')
@@ -258,6 +261,7 @@ function SummativeEvaluation() {
       if (!error) {
         setEvaluation({ ...evaluation, ...evalData })
         setShowSubmitModal(false)
+        success = true
       }
     } else {
       const { data, error } = await supabase
@@ -269,7 +273,18 @@ function SummativeEvaluation() {
       if (!error && data) {
         setEvaluation(data)
         setShowSubmitModal(false)
+        success = true
       }
+    }
+    
+    // Send email notification to staff
+    if (success && staff?.email) {
+      await notifyEvaluationReady({
+        staffEmail: staff.email,
+        staffName: staff.full_name,
+        evaluatorName: profile.full_name,
+        schoolYear: '2025-2026'
+      })
     }
     
     setSaving(false)

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import Navbar from '../components/Navbar'
 
 function MyMeetings() {
   const { profile, signOut } = useAuth()
@@ -129,30 +130,7 @@ function MyMeetings() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Top Navigation */}
-      <nav className="bg-[#2c3e7e] shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-8">
-            <h1 className="text-xl font-bold text-white">StaffTrak</h1>
-            <div className="flex gap-4">
-              <a href="/dashboard" className="text-white hover:text-gray-200">Dashboard</a>
-              <a href="/self-reflection" className="text-white hover:text-gray-200">Self-Reflection</a>
-              <a href="/goals" className="text-white hover:text-gray-200">My Goals</a>
-              <a href="/my-observations" className="text-white hover:text-gray-200">My Observations</a>
-              <a href="/my-meetings" className="text-white hover:text-gray-200 font-semibold">My Meetings</a>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-white">{profile?.full_name}</span>
-            <button
-              onClick={handleLogout}
-              className="bg-white text-[#2c3e7e] px-4 py-2 rounded-lg hover:bg-gray-100"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 py-8">

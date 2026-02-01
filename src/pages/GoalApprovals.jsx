@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { notifyGoalApproved, notifyGoalRevision } from '../services/emailService'
+import Navbar from '../components/Navbar'
 
 function GoalApprovals() {
   const { profile, signOut, isEvaluator } = useAuth()
@@ -35,7 +37,7 @@ function GoalApprovals() {
       .from('goals')
       .select(`
         *,
-        staff:staff_id (id, full_name, position_type, staff_type)
+        staff:staff_id (id, full_name, email, position_type, staff_type)
       `)
       .in('staff_id', staffIds)
       .eq('status', 'submitted')
@@ -61,6 +63,20 @@ function GoalApprovals() {
       .eq('id', goal.id)
 
     if (!error) {
+      // Send email notification to staff
+      try {
+        await notifyGoalApproved({
+          staffEmail: goal.staff?.email,
+          staffName: goal.staff?.full_name,
+          goalTitle: goal.title,
+          evaluatorName: profile.full_name
+        })
+        console.log('Approval email sent to', goal.staff?.email)
+      } catch (emailError) {
+        console.error('Failed to send approval email:', emailError)
+        // Don't block the approval if email fails
+      }
+
       setPendingGoals(pendingGoals.filter(g => g.id !== goal.id))
       setSelectedGoal(null)
       setFeedback('')
@@ -85,13 +101,27 @@ function GoalApprovals() {
       .eq('id', goal.id)
 
     if (!error) {
+      // Send email notification to staff
+      try {
+        await notifyGoalRevision({
+          staffEmail: goal.staff?.email,
+          staffName: goal.staff?.full_name,
+          goalTitle: goal.title,
+          evaluatorName: profile.full_name,
+          feedback: feedback
+        })
+        console.log('Revision request email sent to', goal.staff?.email)
+      } catch (emailError) {
+        console.error('Failed to send revision email:', emailError)
+        // Don't block the revision request if email fails
+      }
+
       setPendingGoals(pendingGoals.filter(g => g.id !== goal.id))
       setSelectedGoal(null)
       setFeedback('')
     }
     setProcessing(false)
   }
-
   const getGoalTypeLabel = (type) => {
     switch(type) {
       case 'slg': return 'Student Learning Goal'
@@ -117,31 +147,7 @@ function GoalApprovals() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Top Navigation */}
-      <nav className="bg-[#2c3e7e] shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-8">
-            <h1 className="text-xl font-bold text-white">StaffTrak</h1>
-            <div className="flex gap-4">
-              <a href="/dashboard" className="text-white hover:text-gray-200">Dashboard</a>
-              <a href="/staff" className="text-white hover:text-gray-200">Staff</a>
-              <a href="/rubrics" className="text-white hover:text-gray-200">Rubrics</a>
-              <a href="/goals" className="text-white hover:text-gray-200">Goals</a>
-              <a href="/goal-approvals" className="text-white hover:text-gray-200 font-semibold">Goal Approvals</a>
-              <a href="/observations" className="text-white hover:text-gray-200">Observations</a>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-white">{profile?.full_name}</span>
-            <button
-              onClick={handleLogout}
-              className="bg-white text-[#2c3e7e] px-4 py-2 rounded-lg hover:bg-gray-100"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
