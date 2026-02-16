@@ -27,7 +27,7 @@ function Dashboard() {
     evaluator: null
   })
   const [actionItems, setActionItems] = useState([])
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+ 
 
   useEffect(() => {
     if (profile?.tenant_id) {
@@ -297,29 +297,6 @@ function Dashboard() {
   const handleLogout = async () => {
     await signOut()
     window.location.href = '/login'
-  }
-
-  // Navigation items based on role
-  const getNavItems = () => {
-    if (isAdmin || isEvaluator) {
-      return [
-        { href: '/dashboard', label: 'Dashboard', active: true },
-        { href: '/staff', label: 'Staff' },
-        { href: '/observations', label: 'Observations' },
-        { href: '/meetings', label: 'Meetings' },
-        { href: '/summatives', label: 'Summatives' },
-        { href: '/reports', label: 'Reports' },
-        { href: '/goal-approvals', label: 'Goal Approvals' }
-      ]
-    }
-    return [
-      { href: '/dashboard', label: 'Dashboard', active: true },
-      { href: '/goals', label: 'My Goals' },
-      { href: '/self-reflection', label: 'Self-Reflection' },
-      { href: '/my-observations', label: 'My Observations' },
-      { href: '/my-meetings', label: 'My Meetings' },
-      { href: '/my-summative', label: 'My Evaluation' }
-    ]
   }
 
   // Get evaluation cycle progress for staff
