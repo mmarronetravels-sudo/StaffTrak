@@ -26,7 +26,6 @@ export default function Navbar() {
         { href: '/observations', label: 'Observations' },
         { href: '/meetings', label: 'Meetings' },
         { href: '/summatives', label: 'Summatives' },
-        { href: '/reports', label: 'Reports' },
         { href: '/goal-approvals', label: 'Goal Approvals' },
         { href: '/leave-tracker', label: 'Leave Tracker' },
 { href: '/ode-staff-position', label: 'ODE Position File' },
