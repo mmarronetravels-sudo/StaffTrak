@@ -3,6 +3,8 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 
+const HOURS_PER_DAY = 8
+
 function LeaveTracker() {
   const { profile } = useAuth()
   const [loading, setLoading] = useState(true)
@@ -40,7 +42,6 @@ function LeaveTracker() {
   const fetchAllData = async () => {
     setLoading(true)
 
-    // Fetch staff
     const { data: staffData } = await supabase
       .from('profiles')
       .select('*')
@@ -48,7 +49,6 @@ function LeaveTracker() {
       .in('role', ['licensed_staff', 'classified_staff'])
       .order('full_name')
 
-    // Fetch leave types
     const { data: typesData } = await supabase
       .from('leave_types')
       .select('*')
@@ -56,21 +56,18 @@ function LeaveTracker() {
       .eq('is_active', true)
       .order('sort_order')
 
-    // Fetch leave policies
     const { data: policiesData } = await supabase
       .from('leave_policies')
       .select('*')
       .eq('tenant_id', profile.tenant_id)
       .eq('school_year', schoolYear)
 
-    // Fetch leave balances
     const { data: balancesData } = await supabase
       .from('leave_balances')
       .select('*')
       .eq('tenant_id', profile.tenant_id)
       .eq('school_year', schoolYear)
 
-    // Fetch leave entries
     const { data: entriesData } = await supabase
       .from('leave_entries')
       .select('*')
@@ -87,10 +84,14 @@ function LeaveTracker() {
     setLoading(false)
   }
 
-  // Initialize balances for a staff member (when they don't have any yet)
+  // Convert hours to days
+  const hoursToDays = (hours) => parseFloat(hours) / HOURS_PER_DAY
+  const daysToHours = (days) => parseFloat(days) * HOURS_PER_DAY
+
+  // Initialize balances for a staff member
   const initializeBalances = async (staffId) => {
     const existingBalances = leaveBalances.filter(b => b.staff_id === staffId)
-    if (existingBalances.length > 0) return // already initialized
+    if (existingBalances.length > 0) return
 
     const newBalances = leaveTypes.map(lt => {
       const policy = leavePolicies.find(p => p.leave_type_id === lt.id)
@@ -123,6 +124,8 @@ function LeaveTracker() {
       return
     }
 
+    const entryAmount = parseFloat(newEntry.amount)
+
     const entryData = {
       tenant_id: profile.tenant_id,
       staff_id: newEntry.staff_id,
@@ -130,7 +133,7 @@ function LeaveTracker() {
       school_year: schoolYear,
       start_date: newEntry.start_date,
       end_date: newEntry.end_date,
-      amount: parseFloat(newEntry.amount),
+      amount: entryAmount,
       tracking_unit: newEntry.tracking_unit,
       concurrent_leave_type_id: newEntry.concurrent_leave_type_id || null,
       reason: newEntry.reason || null,
@@ -148,16 +151,25 @@ function LeaveTracker() {
       return
     }
 
-    // Update the balance
+    // Update the balance (always stored in the policy's tracking unit)
     const existingBalance = leaveBalances.find(
       b => b.staff_id === newEntry.staff_id && b.leave_type_id === newEntry.leave_type_id && b.school_year === schoolYear
     )
 
     if (existingBalance) {
-      const newUsed = parseFloat(existingBalance.used) + parseFloat(newEntry.amount)
+      const balanceUnit = existingBalance.tracking_unit || 'days'
+      let addAmount = entryAmount
+      if (newEntry.tracking_unit === 'hours' && balanceUnit === 'days') {
+        addAmount = hoursToDays(entryAmount)
+      } else if (newEntry.tracking_unit === 'days' && balanceUnit === 'hours') {
+        addAmount = daysToHours(entryAmount)
+      }
+      const newUsed = parseFloat(existingBalance.used) + addAmount
+      const roundedUsed = Math.round(newUsed * 100) / 100
+
       const { data: updatedBalance } = await supabase
         .from('leave_balances')
-        .update({ used: newUsed })
+        .update({ used: roundedUsed })
         .eq('id', existingBalance.id)
         .select()
 
@@ -191,15 +203,23 @@ function LeaveTracker() {
       .eq('id', entry.id)
 
     if (!error) {
-      // Update balance
       const existingBalance = leaveBalances.find(
         b => b.staff_id === entry.staff_id && b.leave_type_id === entry.leave_type_id && b.school_year === schoolYear
       )
       if (existingBalance) {
-        const newUsed = Math.max(0, parseFloat(existingBalance.used) - parseFloat(entry.amount))
+        const balanceUnit = existingBalance.tracking_unit || 'days'
+        let subtractAmount = parseFloat(entry.amount)
+        if (entry.tracking_unit === 'hours' && balanceUnit === 'days') {
+          subtractAmount = hoursToDays(entry.amount)
+        } else if (entry.tracking_unit === 'days' && balanceUnit === 'hours') {
+          subtractAmount = daysToHours(entry.amount)
+        }
+        const newUsed = Math.max(0, parseFloat(existingBalance.used) - subtractAmount)
+        const roundedUsed = Math.round(newUsed * 100) / 100
+
         const { data: updatedBalance } = await supabase
           .from('leave_balances')
-          .update({ used: newUsed })
+          .update({ used: roundedUsed })
           .eq('id', existingBalance.id)
           .select()
 
@@ -211,14 +231,12 @@ function LeaveTracker() {
     }
   }
 
-  // Open staff detail view and initialize balances if needed
   const handleViewStaff = async (staffMember) => {
     setSelectedStaff(staffMember)
     await initializeBalances(staffMember.id)
     setShowDetailModal(true)
   }
 
-  // Open entry modal pre-filled for a specific staff member
   const handleAddEntryForStaff = (staffMember) => {
     setNewEntry(prev => ({ ...prev, staff_id: staffMember.id }))
     setShowEntryModal(true)
@@ -236,7 +254,7 @@ function LeaveTracker() {
       return {
         type: lt,
         policy,
-        balance: balance || { allocated: policy?.days_per_year || policy?.weeks_per_year || 0, used: 0, carried_over: 0 }
+        balance: balance || { allocated: policy?.days_per_year || policy?.weeks_per_year || 0, used: 0, carried_over: 0, tracking_unit: policy?.tracking_unit || 'days' }
       }
     })
   }
@@ -268,8 +286,7 @@ function LeaveTracker() {
 
   // Filter staff
   const filteredStaff = staff.filter(s => {
-    const matchesSearch = s.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesSearch
+    return s.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   })
 
   // Summary stats
@@ -359,7 +376,6 @@ function LeaveTracker() {
         {/* Tab: Staff Overview / Dashboard */}
         {activeTab === 'dashboard' && (
           <div>
-            {/* Search */}
             <div className="mb-4">
               <input
                 type="text"
@@ -370,7 +386,6 @@ function LeaveTracker() {
               />
             </div>
 
-            {/* Staff Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {filteredStaff.map(s => {
                 const balances = getStaffBalances(s.id)
@@ -380,7 +395,6 @@ function LeaveTracker() {
 
                 return (
                   <div key={s.id} className="bg-white rounded-lg shadow p-4">
-                    {/* Staff Header */}
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <h3 className="font-semibold text-[#2c3e7e]">{s.full_name}</h3>
@@ -402,20 +416,22 @@ function LeaveTracker() {
                       </div>
                     </div>
 
-                    {/* School-Provided Balances */}
+                    {/* School-Provided Balances with hours */}
                     <div className="space-y-2">
                       {schoolProvided.map(b => {
                         const allocated = parseFloat(b.balance.allocated) + parseFloat(b.balance.carried_over || 0)
                         const used = parseFloat(b.balance.used)
                         const remaining = Math.max(0, allocated - used)
                         const percent = getUsagePercent(used, allocated)
+                        const remainingHrs = remaining * HOURS_PER_DAY
+                        const allocatedHrs = allocated * HOURS_PER_DAY
 
                         return (
                           <div key={b.type.id}>
                             <div className="flex justify-between text-xs mb-1">
                               <span className="text-[#666666]">{b.type.name}</span>
                               <span className="font-medium text-[#2c3e7e]">
-                                {remaining} of {allocated} {b.balance.tracking_unit || b.policy?.tracking_unit || 'days'} remaining
+                                {remaining} of {allocated} days ({remainingHrs} of {allocatedHrs} hrs)
                               </span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -443,7 +459,6 @@ function LeaveTracker() {
                       </div>
                     )}
 
-                    {/* Recent entries count */}
                     {entries.length > 0 && (
                       <p className="text-xs text-[#666666] mt-2">
                         {entries.length} leave {entries.length === 1 ? 'entry' : 'entries'} this year
@@ -465,7 +480,6 @@ function LeaveTracker() {
         {/* Tab: All Entries */}
         {activeTab === 'entries' && (
           <div>
-            {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-3 mb-4">
               <input
                 type="text"
@@ -486,7 +500,6 @@ function LeaveTracker() {
               </select>
             </div>
 
-            {/* Entries Table */}
             <div className="bg-white rounded-lg shadow overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -520,6 +533,12 @@ function LeaveTracker() {
                         </td>
                         <td className="px-4 py-3 text-sm text-[#666666]">
                           {entry.amount} {entry.tracking_unit}
+                          {entry.tracking_unit === 'hours' && (
+                            <span className="text-xs text-gray-400 ml-1">({(parseFloat(entry.amount) / HOURS_PER_DAY).toFixed(2)} days)</span>
+                          )}
+                          {entry.tracking_unit === 'days' && (
+                            <span className="text-xs text-gray-400 ml-1">({parseFloat(entry.amount) * HOURS_PER_DAY} hrs)</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-[#666666]">
                           {entry.concurrent_leave_type_id ? (
@@ -595,7 +614,9 @@ function LeaveTracker() {
                   )}
                   {policy && (
                     <div className="mt-2 flex flex-wrap gap-3 text-xs text-[#666666]">
-                      {policy.days_per_year && <span>Allocation: {policy.days_per_year} days/year</span>}
+                      {policy.days_per_year && (
+                        <span>Allocation: {policy.days_per_year} days ({policy.days_per_year * HOURS_PER_DAY} hrs) / year</span>
+                      )}
                       {policy.weeks_per_year && <span>Allocation: {policy.weeks_per_year} weeks/year</span>}
                       {policy.carryover_max !== null && policy.carryover_max !== undefined && <span>Carryover: {policy.carryover_max === 0 ? 'None' : `Up to ${policy.carryover_max} days`}</span>}
                       {policy.transfer_max && <span>Transfer: Up to {policy.transfer_max} days between districts</span>}
@@ -640,12 +661,12 @@ function LeaveTracker() {
                   <select
                     value={newEntry.leave_type_id}
                     onChange={(e) => {
-                      const lt = leaveTypes.find(t => t.id === e.target.value)
                       const policy = leavePolicies.find(p => p.leave_type_id === e.target.value)
                       setNewEntry(prev => ({
                         ...prev,
                         leave_type_id: e.target.value,
-                        tracking_unit: policy?.tracking_unit || 'days'
+                        tracking_unit: policy?.tracking_unit === 'weeks' ? 'weeks' : 'days',
+                        amount: ''
                       }))
                     }}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
@@ -668,6 +689,34 @@ function LeaveTracker() {
                     </optgroup>
                   </select>
                 </div>
+
+                {/* Unit Toggle - days/hours (only for day-based leave) */}
+                {newEntry.leave_type_id && (
+                  <div>
+                    <label className="block text-sm font-medium text-[#666666] mb-1">Enter Amount In</label>
+                    <div className="flex rounded-lg overflow-hidden border border-gray-300 w-fit">
+                      {(() => {
+                        const policy = leavePolicies.find(p => p.leave_type_id === newEntry.leave_type_id)
+                        const isWeeksBased = policy?.tracking_unit === 'weeks'
+                        const options = isWeeksBased ? ['weeks'] : ['days', 'hours']
+                        return options.map(unit => (
+                          <button
+                            key={unit}
+                            type="button"
+                            onClick={() => setNewEntry(prev => ({ ...prev, tracking_unit: unit, amount: '' }))}
+                            className={`px-4 py-2 text-sm font-medium transition-colors ${
+                              newEntry.tracking_unit === unit
+                                ? 'bg-[#2c3e7e] text-white'
+                                : 'bg-white text-[#666666] hover:bg-gray-50'
+                            }`}
+                          >
+                            {unit.charAt(0).toUpperCase() + unit.slice(1)}
+                          </button>
+                        ))
+                      })()}
+                    </div>
+                  </div>
+                )}
 
                 {/* Date Range */}
                 <div className="grid grid-cols-2 gap-3">
@@ -698,13 +747,24 @@ function LeaveTracker() {
                   </label>
                   <input
                     type="number"
-                    step="0.5"
+                    step={newEntry.tracking_unit === 'hours' ? '0.25' : '0.5'}
                     min="0"
                     value={newEntry.amount}
                     onChange={(e) => setNewEntry(prev => ({ ...prev, amount: e.target.value }))}
-                    placeholder={`Number of ${newEntry.tracking_unit}`}
+                    placeholder={newEntry.tracking_unit === 'hours' ? 'e.g., 2, 4, 6.5' : `Number of ${newEntry.tracking_unit}`}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
                   />
+                  {/* Show conversion helper */}
+                  {newEntry.amount && newEntry.tracking_unit === 'hours' && (
+                    <p className="text-xs text-[#477fc1] mt-1">
+                      = {(parseFloat(newEntry.amount) / HOURS_PER_DAY).toFixed(2)} days
+                    </p>
+                  )}
+                  {newEntry.amount && newEntry.tracking_unit === 'days' && (
+                    <p className="text-xs text-[#477fc1] mt-1">
+                      = {parseFloat(newEntry.amount) * HOURS_PER_DAY} hours
+                    </p>
+                  )}
                 </div>
 
                 {/* Concurrent Leave */}
@@ -800,7 +860,11 @@ function LeaveTracker() {
                           </span>
                         </div>
                         <span className="text-sm font-medium text-[#2c3e7e]">
-                          {used} / {allocated} {isWeeks ? 'weeks' : 'days'} used
+                          {isWeeks ? (
+                            `${used} / ${allocated} weeks used`
+                          ) : (
+                            `${used} / ${allocated} days (${used * HOURS_PER_DAY} / ${allocated * HOURS_PER_DAY} hrs) used`
+                          )}
                         </span>
                       </div>
                       {allocated > 0 && (
@@ -812,7 +876,13 @@ function LeaveTracker() {
                         </div>
                       )}
                       <div className="flex justify-between text-xs text-[#666666] mt-1">
-                        <span>{remaining} {isWeeks ? 'weeks' : 'days'} remaining</span>
+                        <span>
+                          {isWeeks ? (
+                            `${remaining} weeks remaining`
+                          ) : (
+                            `${remaining} days (${remaining * HOURS_PER_DAY} hrs) remaining`
+                          )}
+                        </span>
                         {parseFloat(b.balance.carried_over) > 0 && (
                           <span>(includes {b.balance.carried_over} carried over)</span>
                         )}
@@ -841,6 +911,12 @@ function LeaveTracker() {
                         </div>
                         <p className="text-sm text-[#2c3e7e] font-medium mt-1">
                           {entry.amount} {entry.tracking_unit}
+                          {entry.tracking_unit === 'hours' && (
+                            <span className="text-xs text-gray-500 ml-1">({(parseFloat(entry.amount) / HOURS_PER_DAY).toFixed(2)} days)</span>
+                          )}
+                          {entry.tracking_unit === 'days' && (
+                            <span className="text-xs text-gray-500 ml-1">({parseFloat(entry.amount) * HOURS_PER_DAY} hrs)</span>
+                          )}
                           {entry.concurrent_leave_type_id && (
                             <span className="text-xs text-yellow-700 ml-2">
                               (concurrent with {getTypeName(entry.concurrent_leave_type_id)})
@@ -863,7 +939,6 @@ function LeaveTracker() {
                 </div>
               )}
 
-              {/* Add entry button */}
               <button
                 onClick={() => {
                   setShowDetailModal(false)
