@@ -102,10 +102,10 @@ function App() {
           />
 
           {/* Admin/Evaluator routes */}
-          <Route 
+         <Route 
             path="/staff" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator', 'hr']}>
                 <Staff />
               </ProtectedRoute>
             } 
