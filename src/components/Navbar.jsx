@@ -15,6 +15,7 @@ export default function Navbar() {
         { href: '/dashboard', label: 'Dashboard' },
         { href: '/staff', label: 'Staff' },
         { href: '/leave-tracker', label: 'Leave Tracker' },
+        <a href="/ode-staff-position" className={/* copy the same className from the Leave Tracker link */}>ODE Position File</a>
         { href: '/reports', label: 'Reports' }
       ]
     }
@@ -28,6 +29,7 @@ export default function Navbar() {
         { href: '/reports', label: 'Reports' },
         { href: '/goal-approvals', label: 'Goal Approvals' },
         { href: '/leave-tracker', label: 'Leave Tracker' }
+        <a href="/ode-staff-position" className={/* copy the same className from the Leave Tracker link */}>ODE Position File</a>
       ]
     }
     return [
