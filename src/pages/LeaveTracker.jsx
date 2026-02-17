@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 
 const HOURS_PER_DAY = 8
+const DAYS_PER_WEEK = 5
+const HOURS_PER_WEEK = HOURS_PER_DAY * DAYS_PER_WEEK // 40
 
 function LeaveTracker() {
   const { profile } = useAuth()
@@ -84,9 +86,47 @@ function LeaveTracker() {
     setLoading(false)
   }
 
-  // Convert hours to days
-  const hoursToDays = (hours) => parseFloat(hours) / HOURS_PER_DAY
-  const daysToHours = (days) => parseFloat(days) * HOURS_PER_DAY
+  // ---- Conversion helpers ----
+  // Everything converts through hours as the common unit
+  const toHours = (amount, unit) => {
+    const num = parseFloat(amount)
+    if (unit === 'hours') return num
+    if (unit === 'days') return num * HOURS_PER_DAY
+    if (unit === 'weeks') return num * HOURS_PER_WEEK
+    return num
+  }
+
+  const fromHours = (hours, unit) => {
+    if (unit === 'hours') return hours
+    if (unit === 'days') return hours / HOURS_PER_DAY
+    if (unit === 'weeks') return hours / HOURS_PER_WEEK
+    return hours
+  }
+
+  const convertAmount = (amount, fromUnit, toUnit) => {
+    const hours = toHours(amount, fromUnit)
+    return fromHours(hours, toUnit)
+  }
+
+  const roundDisplay = (num) => {
+    const rounded = Math.round(num * 100) / 100
+    // Clean up display: show whole numbers without decimals
+    if (rounded === Math.floor(rounded)) return rounded.toString()
+    return rounded.toFixed(2)
+  }
+
+  // Format a balance for display showing multiple units
+  const formatBalanceMulti = (value, policyUnit) => {
+    const num = parseFloat(value)
+    if (policyUnit === 'weeks') {
+      const days = num * DAYS_PER_WEEK
+      const hours = num * HOURS_PER_WEEK
+      return `${roundDisplay(num)} wks (${roundDisplay(days)} days / ${roundDisplay(hours)} hrs)`
+    }
+    // days-based
+    const hours = num * HOURS_PER_DAY
+    return `${roundDisplay(num)} days (${roundDisplay(hours)} hrs)`
+  }
 
   // Initialize balances for a staff member
   const initializeBalances = async (staffId) => {
@@ -151,19 +191,14 @@ function LeaveTracker() {
       return
     }
 
-    // Update the balance (always stored in the policy's tracking unit)
+    // Update balance - convert entry unit to the balance's stored unit
     const existingBalance = leaveBalances.find(
       b => b.staff_id === newEntry.staff_id && b.leave_type_id === newEntry.leave_type_id && b.school_year === schoolYear
     )
 
     if (existingBalance) {
       const balanceUnit = existingBalance.tracking_unit || 'days'
-      let addAmount = entryAmount
-      if (newEntry.tracking_unit === 'hours' && balanceUnit === 'days') {
-        addAmount = hoursToDays(entryAmount)
-      } else if (newEntry.tracking_unit === 'days' && balanceUnit === 'hours') {
-        addAmount = daysToHours(entryAmount)
-      }
+      const addAmount = convertAmount(entryAmount, newEntry.tracking_unit, balanceUnit)
       const newUsed = parseFloat(existingBalance.used) + addAmount
       const roundedUsed = Math.round(newUsed * 100) / 100
 
@@ -208,12 +243,7 @@ function LeaveTracker() {
       )
       if (existingBalance) {
         const balanceUnit = existingBalance.tracking_unit || 'days'
-        let subtractAmount = parseFloat(entry.amount)
-        if (entry.tracking_unit === 'hours' && balanceUnit === 'days') {
-          subtractAmount = hoursToDays(entry.amount)
-        } else if (entry.tracking_unit === 'days' && balanceUnit === 'hours') {
-          subtractAmount = daysToHours(entry.amount)
-        }
+        const subtractAmount = convertAmount(parseFloat(entry.amount), entry.tracking_unit, balanceUnit)
         const newUsed = Math.max(0, parseFloat(existingBalance.used) - subtractAmount)
         const roundedUsed = Math.round(newUsed * 100) / 100
 
@@ -246,6 +276,10 @@ function LeaveTracker() {
   const getTypeName = (typeId) => leaveTypes.find(t => t.id === typeId)?.name || 'Unknown'
   const getTypeCategory = (typeId) => leaveTypes.find(t => t.id === typeId)?.category || ''
   const getStaffName = (staffId) => staff.find(s => s.id === staffId)?.full_name || 'Unknown'
+  const getPolicyUnit = (typeId) => {
+    const policy = leavePolicies.find(p => p.leave_type_id === typeId)
+    return policy?.tracking_unit || 'days'
+  }
 
   const getStaffBalances = (staffId) => {
     return leaveTypes.map(lt => {
@@ -282,6 +316,23 @@ function LeaveTracker() {
     if (percent >= 75) return 'bg-[#f3843e]'
     if (percent >= 50) return 'bg-yellow-400'
     return 'bg-green-500'
+  }
+
+  // Format entry amount for display with conversion
+  const formatEntryAmount = (amount, unit) => {
+    const num = parseFloat(amount)
+    if (unit === 'hours') {
+      const days = roundDisplay(num / HOURS_PER_DAY)
+      return `${roundDisplay(num)} hrs (${days} days)`
+    }
+    if (unit === 'weeks') {
+      const days = roundDisplay(num * DAYS_PER_WEEK)
+      const hrs = roundDisplay(num * HOURS_PER_WEEK)
+      return `${roundDisplay(num)} wks (${days} days / ${hrs} hrs)`
+    }
+    // days
+    const hrs = roundDisplay(num * HOURS_PER_DAY)
+    return `${roundDisplay(num)} days (${hrs} hrs)`
   }
 
   // Filter staff
@@ -322,7 +373,7 @@ function LeaveTracker() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
           <div>
             <h2 className="text-2xl font-bold text-[#2c3e7e]">Leave Tracker</h2>
-            <p className="text-[#666666] text-sm mt-1">School Year: {schoolYear}</p>
+            <p className="text-[#666666] text-sm mt-1">School Year: {schoolYear} &nbsp;|&nbsp; 1 week = {DAYS_PER_WEEK} days = {HOURS_PER_WEEK} hrs</p>
           </div>
           <button
             onClick={() => setShowEntryModal(true)}
@@ -416,22 +467,21 @@ function LeaveTracker() {
                       </div>
                     </div>
 
-                    {/* School-Provided Balances with hours */}
+                    {/* School-Provided Balances */}
                     <div className="space-y-2">
                       {schoolProvided.map(b => {
                         const allocated = parseFloat(b.balance.allocated) + parseFloat(b.balance.carried_over || 0)
                         const used = parseFloat(b.balance.used)
                         const remaining = Math.max(0, allocated - used)
                         const percent = getUsagePercent(used, allocated)
-                        const remainingHrs = remaining * HOURS_PER_DAY
-                        const allocatedHrs = allocated * HOURS_PER_DAY
+                        const unit = b.balance.tracking_unit || b.policy?.tracking_unit || 'days'
 
                         return (
                           <div key={b.type.id}>
                             <div className="flex justify-between text-xs mb-1">
                               <span className="text-[#666666]">{b.type.name}</span>
                               <span className="font-medium text-[#2c3e7e]">
-                                {remaining} of {allocated} days ({remainingHrs} of {allocatedHrs} hrs)
+                                {formatBalanceMulti(remaining, unit)} remaining
                               </span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -450,11 +500,14 @@ function LeaveTracker() {
                       <div className="mt-3 pt-3 border-t border-gray-100">
                         <p className="text-xs text-[#666666] font-medium mb-1">State/Federal Leave Used:</p>
                         <div className="flex flex-wrap gap-2">
-                          {stateFederal.filter(b => parseFloat(b.balance.used) > 0).map(b => (
-                            <span key={b.type.id} className={`text-xs px-2 py-0.5 rounded-full ${getCategoryColor(b.type.category)}`}>
-                              {b.type.name}: {b.balance.used} {b.policy?.tracking_unit || 'weeks'}
-                            </span>
-                          ))}
+                          {stateFederal.filter(b => parseFloat(b.balance.used) > 0).map(b => {
+                            const unit = b.balance.tracking_unit || b.policy?.tracking_unit || 'weeks'
+                            return (
+                              <span key={b.type.id} className={`text-xs px-2 py-0.5 rounded-full ${getCategoryColor(b.type.category)}`}>
+                                {b.type.name}: {formatBalanceMulti(b.balance.used, unit)} used
+                              </span>
+                            )
+                          })}
                         </div>
                       </div>
                     )}
@@ -532,13 +585,7 @@ function LeaveTracker() {
                           {new Date(entry.start_date).toLocaleDateString()} – {new Date(entry.end_date).toLocaleDateString()}
                         </td>
                         <td className="px-4 py-3 text-sm text-[#666666]">
-                          {entry.amount} {entry.tracking_unit}
-                          {entry.tracking_unit === 'hours' && (
-                            <span className="text-xs text-gray-400 ml-1">({(parseFloat(entry.amount) / HOURS_PER_DAY).toFixed(2)} days)</span>
-                          )}
-                          {entry.tracking_unit === 'days' && (
-                            <span className="text-xs text-gray-400 ml-1">({parseFloat(entry.amount) * HOURS_PER_DAY} hrs)</span>
-                          )}
+                          {formatEntryAmount(entry.amount, entry.tracking_unit)}
                         </td>
                         <td className="px-4 py-3 text-sm text-[#666666]">
                           {entry.concurrent_leave_type_id ? (
@@ -617,7 +664,9 @@ function LeaveTracker() {
                       {policy.days_per_year && (
                         <span>Allocation: {policy.days_per_year} days ({policy.days_per_year * HOURS_PER_DAY} hrs) / year</span>
                       )}
-                      {policy.weeks_per_year && <span>Allocation: {policy.weeks_per_year} weeks/year</span>}
+                      {policy.weeks_per_year && (
+                        <span>Allocation: {policy.weeks_per_year} weeks ({policy.weeks_per_year * DAYS_PER_WEEK} days / {policy.weeks_per_year * HOURS_PER_WEEK} hrs) / year</span>
+                      )}
                       {policy.carryover_max !== null && policy.carryover_max !== undefined && <span>Carryover: {policy.carryover_max === 0 ? 'None' : `Up to ${policy.carryover_max} days`}</span>}
                       {policy.transfer_max && <span>Transfer: Up to {policy.transfer_max} days between districts</span>}
                     </div>
@@ -661,11 +710,10 @@ function LeaveTracker() {
                   <select
                     value={newEntry.leave_type_id}
                     onChange={(e) => {
-                      const policy = leavePolicies.find(p => p.leave_type_id === e.target.value)
                       setNewEntry(prev => ({
                         ...prev,
                         leave_type_id: e.target.value,
-                        tracking_unit: policy?.tracking_unit === 'weeks' ? 'weeks' : 'days',
+                        tracking_unit: 'days',
                         amount: ''
                       }))
                     }}
@@ -690,7 +738,7 @@ function LeaveTracker() {
                   </select>
                 </div>
 
-                {/* Unit Toggle - days/hours (only for day-based leave) */}
+                {/* Unit Toggle - always shown after selecting leave type */}
                 {newEntry.leave_type_id && (
                   <div>
                     <label className="block text-sm font-medium text-[#666666] mb-1">Enter Amount In</label>
@@ -698,7 +746,7 @@ function LeaveTracker() {
                       {(() => {
                         const policy = leavePolicies.find(p => p.leave_type_id === newEntry.leave_type_id)
                         const isWeeksBased = policy?.tracking_unit === 'weeks'
-                        const options = isWeeksBased ? ['weeks'] : ['days', 'hours']
+                        const options = isWeeksBased ? ['weeks', 'days', 'hours'] : ['days', 'hours']
                         return options.map(unit => (
                           <button
                             key={unit}
@@ -740,29 +788,36 @@ function LeaveTracker() {
                   </div>
                 </div>
 
-                {/* Amount */}
+                {/* Amount with conversion display */}
                 <div>
                   <label className="block text-sm font-medium text-[#666666] mb-1">
                     Amount ({newEntry.tracking_unit}) *
                   </label>
                   <input
                     type="number"
-                    step={newEntry.tracking_unit === 'hours' ? '0.25' : '0.5'}
+                    step={newEntry.tracking_unit === 'hours' ? '0.25' : newEntry.tracking_unit === 'weeks' ? '0.1' : '0.5'}
                     min="0"
                     value={newEntry.amount}
                     onChange={(e) => setNewEntry(prev => ({ ...prev, amount: e.target.value }))}
-                    placeholder={newEntry.tracking_unit === 'hours' ? 'e.g., 2, 4, 6.5' : `Number of ${newEntry.tracking_unit}`}
+                    placeholder={
+                      newEntry.tracking_unit === 'hours' ? 'e.g., 2, 4, 6.5' :
+                      newEntry.tracking_unit === 'weeks' ? 'e.g., 1, 2.5, 8' :
+                      'e.g., 1, 2, 0.5'
+                    }
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
                   />
-                  {/* Show conversion helper */}
-                  {newEntry.amount && newEntry.tracking_unit === 'hours' && (
+                  {/* Conversion helper */}
+                  {newEntry.amount && parseFloat(newEntry.amount) > 0 && (
                     <p className="text-xs text-[#477fc1] mt-1">
-                      = {(parseFloat(newEntry.amount) / HOURS_PER_DAY).toFixed(2)} days
-                    </p>
-                  )}
-                  {newEntry.amount && newEntry.tracking_unit === 'days' && (
-                    <p className="text-xs text-[#477fc1] mt-1">
-                      = {parseFloat(newEntry.amount) * HOURS_PER_DAY} hours
+                      {newEntry.tracking_unit === 'hours' && (
+                        <>= {roundDisplay(parseFloat(newEntry.amount) / HOURS_PER_DAY)} days ({roundDisplay(parseFloat(newEntry.amount) / HOURS_PER_WEEK)} weeks)</>
+                      )}
+                      {newEntry.tracking_unit === 'days' && (
+                        <>= {roundDisplay(parseFloat(newEntry.amount) * HOURS_PER_DAY)} hours ({roundDisplay(parseFloat(newEntry.amount) / DAYS_PER_WEEK)} weeks)</>
+                      )}
+                      {newEntry.tracking_unit === 'weeks' && (
+                        <>= {roundDisplay(parseFloat(newEntry.amount) * DAYS_PER_WEEK)} days ({roundDisplay(parseFloat(newEntry.amount) * HOURS_PER_WEEK)} hours)</>
+                      )}
                     </p>
                   )}
                 </div>
@@ -848,23 +903,19 @@ function LeaveTracker() {
                   const used = parseFloat(b.balance.used)
                   const remaining = Math.max(0, allocated - used)
                   const percent = getUsagePercent(used, allocated)
-                  const isWeeks = b.policy?.tracking_unit === 'weeks'
+                  const unit = b.balance.tracking_unit || b.policy?.tracking_unit || 'days'
 
                   return (
                     <div key={b.type.id} className="bg-gray-50 rounded-lg p-3">
-                      <div className="flex justify-between items-center mb-1">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-1 gap-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm text-[#2c3e7e]">{b.type.name}</span>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${getCategoryColor(b.type.category)}`}>
                             {b.type.category === 'school_provided' ? 'School' : b.type.category === 'state' ? 'State' : 'Federal'}
                           </span>
                         </div>
-                        <span className="text-sm font-medium text-[#2c3e7e]">
-                          {isWeeks ? (
-                            `${used} / ${allocated} weeks used`
-                          ) : (
-                            `${used} / ${allocated} days (${used * HOURS_PER_DAY} / ${allocated * HOURS_PER_DAY} hrs) used`
-                          )}
+                        <span className="text-xs font-medium text-[#2c3e7e]">
+                          {formatBalanceMulti(used, unit)} used of {formatBalanceMulti(allocated, unit)}
                         </span>
                       </div>
                       {allocated > 0 && (
@@ -876,13 +927,7 @@ function LeaveTracker() {
                         </div>
                       )}
                       <div className="flex justify-between text-xs text-[#666666] mt-1">
-                        <span>
-                          {isWeeks ? (
-                            `${remaining} weeks remaining`
-                          ) : (
-                            `${remaining} days (${remaining * HOURS_PER_DAY} hrs) remaining`
-                          )}
-                        </span>
+                        <span>{formatBalanceMulti(remaining, unit)} remaining</span>
                         {parseFloat(b.balance.carried_over) > 0 && (
                           <span>(includes {b.balance.carried_over} carried over)</span>
                         )}
@@ -910,13 +955,7 @@ function LeaveTracker() {
                           </span>
                         </div>
                         <p className="text-sm text-[#2c3e7e] font-medium mt-1">
-                          {entry.amount} {entry.tracking_unit}
-                          {entry.tracking_unit === 'hours' && (
-                            <span className="text-xs text-gray-500 ml-1">({(parseFloat(entry.amount) / HOURS_PER_DAY).toFixed(2)} days)</span>
-                          )}
-                          {entry.tracking_unit === 'days' && (
-                            <span className="text-xs text-gray-500 ml-1">({parseFloat(entry.amount) * HOURS_PER_DAY} hrs)</span>
-                          )}
+                          {formatEntryAmount(entry.amount, entry.tracking_unit)}
                           {entry.concurrent_leave_type_id && (
                             <span className="text-xs text-yellow-700 ml-2">
                               (concurrent with {getTypeName(entry.concurrent_leave_type_id)})
