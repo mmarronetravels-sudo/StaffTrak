@@ -21,6 +21,7 @@ import Reports from './pages/Reports'
 import StaffImport from './pages/StaffImport'
 import AuthCallback from './pages/AuthCallback'
 import LeaveTracker from './pages/LeaveTracker'
+import ODEStaffPosition from './pages/ODEStaffPosition'
 
 function App() {
   return (
@@ -211,8 +212,17 @@ function App() {
               </ProtectedRoute>
             } 
           />
+           {/* ODE Staff Position File - Admin/HR */}
+          <Route 
+            path="/ode-staff-position" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'hr']}>
+                <ODEStaffPosition />
+              </ProtectedRoute>
+            } 
+          />
         </Routes>
-      </BrowserRouter>
+             </BrowserRouter>
     </AuthProvider>
   )
 }
@@ -230,5 +240,6 @@ function Home() {
     </div>
   )
 }
+
 
 export default App
