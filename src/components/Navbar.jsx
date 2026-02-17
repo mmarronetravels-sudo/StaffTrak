@@ -1,17 +1,23 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-
 export default function Navbar() {
   const { user, profile, signOut, isAdmin, isEvaluator } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
   const handleLogout = async () => {
     await signOut()
     window.location.href = '/login'
   }
-
+  const isHR = profile?.role === 'hr'
   // Navigation items based on role
   const getNavItems = () => {
+    if (isHR) {
+      return [
+        { href: '/dashboard', label: 'Dashboard' },
+        { href: '/staff', label: 'Staff' },
+        { href: '/leave-tracker', label: 'Leave Tracker' },
+        { href: '/reports', label: 'Reports' }
+      ]
+    }
     if (isAdmin || isEvaluator) {
       return [
         { href: '/dashboard', label: 'Dashboard' },
@@ -20,7 +26,8 @@ export default function Navbar() {
         { href: '/meetings', label: 'Meetings' },
         { href: '/summatives', label: 'Summatives' },
         { href: '/reports', label: 'Reports' },
-        { href: '/goal-approvals', label: 'Goal Approvals' }
+        { href: '/goal-approvals', label: 'Goal Approvals' },
+        { href: '/leave-tracker', label: 'Leave Tracker' }
       ]
     }
     return [
@@ -32,7 +39,6 @@ export default function Navbar() {
       { href: '/my-summative', label: 'My Evaluation' }
     ]
   }
-
   return (
     <nav className="bg-[#2c3e7e] shadow">
       <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
