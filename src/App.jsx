@@ -20,6 +20,7 @@ import MySummative from './pages/MySummative'
 import Reports from './pages/Reports'
 import StaffImport from './pages/StaffImport'
 import AuthCallback from './pages/AuthCallback'
+import LeaveTracker from './pages/LeaveTracker'
 
 function App() {
   return (
@@ -29,11 +30,7 @@ function App() {
           {/* Public routes */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
-
-          {/* Public routes */}
-<Route path="/" element={<Home />} />
-<Route path="/login" element={<Login />} />
-<Route path="/auth/callback" element={<AuthCallback />} />   {/* ADD THIS LINE */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
 
           {/* Protected routes - all authenticated users */}
           <Route 
@@ -104,31 +101,21 @@ function App() {
             } 
           />
 
-          <Route 
-  path="/staff" 
-  element={
-    <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
-      <Staff />
-    </ProtectedRoute>
-  } 
-/>
-
-{/* ADD THIS BLOCK RIGHT HERE */}
-<Route 
-  path="/staff/import" 
-  element={
-    <ProtectedRoute allowedRoles={['district_admin', 'school_admin']}>
-      <StaffImport />
-    </ProtectedRoute>
-  } 
-/>
-
           {/* Admin/Evaluator routes */}
           <Route 
             path="/staff" 
             element={
               <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
                 <Staff />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/staff/import" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin']}>
+                <StaffImport />
               </ProtectedRoute>
             } 
           />
@@ -205,12 +192,22 @@ function App() {
             } 
           />
 
-          {/* Reports - Admin/Evaluator only */}
+          {/* Reports - Admin/Evaluator/HR */}
           <Route 
             path="/reports" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator', 'hr']}>
                 <Reports />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Leave Tracker - Admin/HR */}
+          <Route 
+            path="/leave-tracker" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'hr']}>
+                <LeaveTracker />
               </ProtectedRoute>
             } 
           />
