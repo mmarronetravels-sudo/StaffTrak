@@ -15,8 +15,8 @@ export default function Navbar() {
         { href: '/dashboard', label: 'Dashboard' },
         { href: '/staff', label: 'Staff' },
         { href: '/leave-tracker', label: 'Leave Tracker' },
-        <a href="/ode-staff-position" className={/* copy the same className from the Leave Tracker link */}>ODE Position File</a>
-        { href: '/reports', label: 'Reports' }
+{ href: '/ode-staff-position', label: 'ODE Position File' },
+
       ]
     }
     if (isAdmin || isEvaluator) {
@@ -28,8 +28,10 @@ export default function Navbar() {
         { href: '/summatives', label: 'Summatives' },
         { href: '/reports', label: 'Reports' },
         { href: '/goal-approvals', label: 'Goal Approvals' },
-        { href: '/leave-tracker', label: 'Leave Tracker' }
-        <a href="/ode-staff-position" className={/* copy the same className from the Leave Tracker link */}>ODE Position File</a>
+        { href: '/leave-tracker', label: 'Leave Tracker' },
+{ href: '/ode-staff-position', label: 'ODE Position File' },
+{ href: '/reports', label: 'Reports' }
+        
       ]
     }
     return [
