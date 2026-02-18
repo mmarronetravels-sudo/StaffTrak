@@ -102,11 +102,11 @@ function App() {
             } 
           />
 
-          {/* Admin/Evaluator routes */}
-         <Route 
+          {/* Admin + Evaluator routes (is_evaluator flag OR admin role) */}
+          <Route 
             path="/staff" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator', 'hr']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Staff />
               </ProtectedRoute>
             } 
@@ -115,7 +115,7 @@ function App() {
           <Route 
             path="/staff/import" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin']}>
+              <ProtectedRoute allowedRoles={['district_admin']}>
                 <StaffImport />
               </ProtectedRoute>
             } 
@@ -124,7 +124,7 @@ function App() {
           <Route 
             path="/rubrics" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Rubrics />
               </ProtectedRoute>
             } 
@@ -133,7 +133,7 @@ function App() {
           <Route 
             path="/goal-approvals" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <GoalApprovals />
               </ProtectedRoute>
             } 
@@ -142,7 +142,7 @@ function App() {
           <Route 
             path="/observations" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Observations />
               </ProtectedRoute>
             } 
@@ -151,7 +151,7 @@ function App() {
           <Route 
             path="/observations/:id" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <ObservationSession />
               </ProtectedRoute>
             } 
@@ -160,7 +160,7 @@ function App() {
           <Route 
             path="/meetings" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Meetings />
               </ProtectedRoute>
             } 
@@ -178,7 +178,7 @@ function App() {
           <Route 
             path="/summatives" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Summatives />
               </ProtectedRoute>
             } 
@@ -187,42 +187,43 @@ function App() {
           <Route 
             path="/summatives/:staffId" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <SummativeEvaluation />
               </ProtectedRoute>
             } 
           />
 
-          {/* Reports - Admin/Evaluator/HR */}
+          {/* Reports - Admin + Evaluators + HR */}
           <Route 
             path="/reports" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator', 'hr']}>
+              <ProtectedRoute allowedRoles={['district_admin', 'hr']} allowEvaluators>
                 <Reports />
               </ProtectedRoute>
             } 
           />
 
-          {/* Leave Tracker - Admin/HR */}
+          {/* Leave Tracker - Admin + HR */}
           <Route 
             path="/leave-tracker" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'hr']}>
+              <ProtectedRoute allowedRoles={['district_admin', 'hr']}>
                 <LeaveTracker />
               </ProtectedRoute>
             } 
           />
-           {/* ODE Staff Position File - Admin/HR */}
+
+          {/* ODE Staff Position - Admin + HR */}
           <Route 
             path="/ode-staff-position" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'hr']}>
+              <ProtectedRoute allowedRoles={['district_admin', 'hr']}>
                 <ODEStaffPosition />
               </ProtectedRoute>
             } 
           />
         </Routes>
-             </BrowserRouter>
+      </BrowserRouter>
     </AuthProvider>
   )
 }
@@ -240,6 +241,5 @@ function Home() {
     </div>
   )
 }
-
 
 export default App
