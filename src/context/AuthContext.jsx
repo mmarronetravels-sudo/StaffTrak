@@ -64,9 +64,14 @@ export function AuthProvider({ children }) {
     profile,
     loading,
     signOut,
+    // Admin = district_admin or school_admin
     isAdmin: profile?.role === 'district_admin' || profile?.role === 'school_admin',
-    isEvaluator: profile?.role === 'evaluator' || profile?.role === 'district_admin' || profile?.role === 'school_admin',
+    // Evaluator = anyone with is_evaluator flag OR district/school admin
+    isEvaluator: profile?.is_evaluator === true || profile?.role === 'district_admin' || profile?.role === 'school_admin',
+    // Staff = licensed or classified (note: evaluators may also be staff)
     isStaff: profile?.role === 'licensed_staff' || profile?.role === 'classified_staff',
+    // HR role
+    isHR: profile?.role === 'hr',
   }
 
   return (
