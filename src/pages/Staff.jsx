@@ -206,13 +206,16 @@ function Staff() {
     ],
     classified: [
       'advisor',
-      'secretary', 
-      'registrar', 
-      'student_advisor', 
-      'technology_lead', 
-      'executive_assistant',
+      'student_support',
       'paraprofessional',
+      'secretary', 
+      'registrar',
+      'receptionist',
       'office_manager',
+      'technology_lead', 
+      'translator',
+      'community_partnerships',
+      'executive_assistant',
       'bookkeeper'
     ]
   }
