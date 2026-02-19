@@ -13,6 +13,7 @@ function Staff() {
   const [selectedStaff, setSelectedStaff] = useState(null)
   const [filter, setFilter] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
   
   const [newStaff, setNewStaff] = useState({
     email: '',
@@ -51,8 +52,8 @@ function Staff() {
       .from('profiles')
       .select('id, full_name, role')
       .eq('tenant_id', profile.tenant_id)
-      .in('role', ['school_admin', 'district_admin', 'evaluator'])
       .eq('is_active', true)
+      .or('is_evaluator.eq.true,role.eq.district_admin')
       .order('full_name')
 
     if (!error) {
@@ -162,6 +163,47 @@ function Staff() {
     return evaluator ? evaluator.full_name : 'Not Assigned'
   }
 
+  const handleArchiveStaff = async (staffMember) => {
+    const action = staffMember.is_active !== false ? 'archive' : 'reactivate'
+    if (!confirm(`Are you sure you want to ${action} ${staffMember.full_name}?`)) return
+
+    const newStatus = staffMember.is_active === false ? true : false
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_active: newStatus })
+      .eq('id', staffMember.id)
+
+    if (error) {
+      alert('Error updating staff: ' + error.message)
+      return
+    }
+
+    setStaff(prev => prev.map(s => s.id === staffMember.id ? { ...s, is_active: newStatus } : s))
+    setShowViewModal(false)
+    setSelectedStaff(null)
+  }
+
+  const handleDeleteStaff = async (staffMember) => {
+    if (!confirm(`⚠️ PERMANENT DELETE\n\nAre you sure you want to permanently delete ${staffMember.full_name}?\n\nThis will remove all their data including evaluations, observations, and leave records.\n\nConsider archiving instead if you want to keep their records.`)) return
+    
+    // Second confirmation for safety
+    if (!confirm(`Final confirmation: permanently delete ${staffMember.full_name}? This cannot be undone.`)) return
+
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', staffMember.id)
+
+    if (error) {
+      alert('Error deleting staff: ' + error.message)
+      return
+    }
+
+    setStaff(prev => prev.filter(s => s.id !== staffMember.id))
+    setShowViewModal(false)
+    setSelectedStaff(null)
+  }
+
   const filteredStaff = staff.filter(s => {
     const matchesFilter = filter === 'all' || 
                          (filter === 'licensed' && s.staff_type === 'licensed') ||
@@ -169,7 +211,8 @@ function Staff() {
     const matchesSearch = s.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          s.position_type?.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesFilter && matchesSearch
+    const matchesArchived = showArchived || s.is_active !== false
+    return matchesFilter && matchesSearch && matchesArchived
   })
 
   const handleLogout = async () => {
@@ -265,6 +308,20 @@ function Staff() {
                 {f === 'all' ? 'All' : f}
               </button>
             ))}
+            <label className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg text-sm text-[#666666] cursor-pointer hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              Show Archived
+              {staff.filter(s => s.is_active === false).length > 0 && (
+                <span className="bg-red-100 text-red-700 text-xs px-1.5 py-0.5 rounded-full">
+                  {staff.filter(s => s.is_active === false).length}
+                </span>
+              )}
+            </label>
           </div>
         </div>
 
@@ -309,7 +366,7 @@ function Staff() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredStaff.map(member => (
-                  <tr key={member.id} className="hover:bg-gray-50">
+                  <tr key={member.id} className={`hover:bg-gray-50 ${member.is_active === false ? 'opacity-50' : ''}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="font-medium text-[#2c3e7e]">{member.full_name}</div>
@@ -349,9 +406,15 @@ function Staff() {
                       </button>
                       <button
                         onClick={() => handleEditStaff(member)}
-                        className="text-[#f3843e] hover:text-[#d9702f]"
+                        className="text-[#f3843e] hover:text-[#d9702f] mr-3"
                       >
                         Edit
+                      </button>
+                      <button
+                        onClick={() => handleArchiveStaff(member)}
+                        className={`text-xs ${member.is_active !== false ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'}`}
+                      >
+                        {member.is_active !== false ? 'Archive' : 'Reactivate'}
                       </button>
                     </td>
                   </tr>
@@ -622,8 +685,25 @@ function Staff() {
 
               <div className="flex gap-3 mt-6">
                 <button
+                  onClick={() => handleArchiveStaff(selectedStaff)}
+                  className={`px-4 py-2 rounded-lg text-sm ${
+                    selectedStaff.is_active !== false
+                      ? 'border border-yellow-400 text-yellow-700 hover:bg-yellow-50'
+                      : 'border border-green-400 text-green-700 hover:bg-green-50'
+                  }`}
+                >
+                  {selectedStaff.is_active !== false ? 'Archive' : 'Reactivate'}
+                </button>
+                <button
+                  onClick={() => handleDeleteStaff(selectedStaff)}
+                  className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm"
+                >
+                  Delete
+                </button>
+                <div className="flex-1" />
+                <button
                   onClick={() => { setShowViewModal(false); setSelectedStaff(null); }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-[#666666] hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-[#666666] hover:bg-gray-50"
                 >
                   Close
                 </button>
@@ -632,7 +712,7 @@ function Staff() {
                     setShowViewModal(false)
                     handleEditStaff(selectedStaff)
                   }}
-                  className="flex-1 px-4 py-2 bg-[#2c3e7e] text-white rounded-lg hover:bg-[#1e2a5e]"
+                  className="px-4 py-2 bg-[#2c3e7e] text-white rounded-lg hover:bg-[#1e2a5e]"
                 >
                   Edit Staff
                 </button>
