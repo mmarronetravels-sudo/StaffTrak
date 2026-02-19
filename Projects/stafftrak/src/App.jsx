@@ -18,6 +18,10 @@ import Summatives from './pages/Summatives'
 import SummativeEvaluation from './pages/SummativeEvaluation'
 import MySummative from './pages/MySummative'
 import Reports from './pages/Reports'
+import StaffImport from './pages/StaffImport'
+import AuthCallback from './pages/AuthCallback'
+import LeaveTracker from './pages/LeaveTracker'
+import ODEStaffPosition from './pages/ODEStaffPosition'
 
 function App() {
   return (
@@ -27,6 +31,7 @@ function App() {
           {/* Public routes */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
 
           {/* Protected routes - all authenticated users */}
           <Route 
@@ -97,12 +102,21 @@ function App() {
             } 
           />
 
-          {/* Admin/Evaluator routes */}
+          {/* Admin/Evaluator routes - use allowEvaluators for is_evaluator flag */}
           <Route 
             path="/staff" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin', 'hr']} allowEvaluators>
                 <Staff />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/staff/import" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin']}>
+                <StaffImport />
               </ProtectedRoute>
             } 
           />
@@ -110,7 +124,7 @@ function App() {
           <Route 
             path="/rubrics" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Rubrics />
               </ProtectedRoute>
             } 
@@ -119,7 +133,7 @@ function App() {
           <Route 
             path="/goal-approvals" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <GoalApprovals />
               </ProtectedRoute>
             } 
@@ -128,7 +142,7 @@ function App() {
           <Route 
             path="/observations" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Observations />
               </ProtectedRoute>
             } 
@@ -137,7 +151,7 @@ function App() {
           <Route 
             path="/observations/:id" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <ObservationSession />
               </ProtectedRoute>
             } 
@@ -146,7 +160,7 @@ function App() {
           <Route 
             path="/meetings" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Meetings />
               </ProtectedRoute>
             } 
@@ -164,7 +178,7 @@ function App() {
           <Route 
             path="/summatives" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Summatives />
               </ProtectedRoute>
             } 
@@ -173,18 +187,38 @@ function App() {
           <Route 
             path="/summatives/:staffId" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <SummativeEvaluation />
               </ProtectedRoute>
             } 
           />
 
-          {/* Reports - Admin/Evaluator only */}
+          {/* Reports - Admin/Evaluator/HR */}
           <Route 
             path="/reports" 
             element={
-              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'evaluator']}>
+              <ProtectedRoute allowedRoles={['district_admin', 'hr']} allowEvaluators>
                 <Reports />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Leave Tracker - Admin/HR */}
+          <Route 
+            path="/leave-tracker" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'hr']}>
+                <LeaveTracker />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* ODE Staff Position File - Admin/HR */}
+          <Route 
+            path="/ode-staff-position" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'hr']}>
+                <ODEStaffPosition />
               </ProtectedRoute>
             } 
           />
