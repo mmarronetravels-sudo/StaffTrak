@@ -221,9 +221,35 @@ function Staff() {
   }
 
   const positionOptions = {
-    licensed: ['teacher', 'school_counselor', 'administrator', 'special_education_director'],
-    classified: ['secretary', 'registrar', 'student_advisor', 'technology_lead', 'executive_assistant']
-  }
+  licensed: [
+    'teacher',
+    'school_counselor',
+    'ec_counselor',
+    'administrator',
+    'principal',
+    'assistant_principal',
+    'director',
+    'case_manager',
+    'curriculum_specialist',
+    'instructional_coach',
+    'special_education_director',
+    'student_support_specialist'
+  ],
+  classified: [
+    'secretary',
+    'registrar',
+    'va_advisor',
+    'student_advisor',
+    'student_support',
+    'cultural_liaison',
+    'paraprofessional',
+    'receptionist',
+    'translator',
+    'community_partnerships',
+    'technology_lead',
+    'executive_assistant'
+  ]
+}
 
   return (
     <div className="min-h-screen bg-gray-100">
