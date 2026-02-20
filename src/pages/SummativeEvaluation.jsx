@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { notifyEvaluationReady } from '../services/emailService'
 import { SummativePDFDownload } from '../components/SummativePDF'
+import Navbar from '../components/Navbar'
 
 function SummativeEvaluation() {
   const { staffId } = useParams()
@@ -61,37 +62,54 @@ function SummativeEvaluation() {
   }
 
   const fetchRubric = async (staffData) => {
-    // Get the appropriate rubric for this staff member
-    let rubricQuery = supabase
-      .from('rubrics')
-      .select('*')
-      .eq('staff_type', staffData.staff_type)
-      .eq('is_active', true)
-    
-    // Try to match position-specific rubric first
-    if (staffData.position_type === 'teacher') {
-      rubricQuery = rubricQuery.ilike('name', '%teacher%')
-    } else if (staffData.position_type === 'counselor') {
-      rubricQuery = rubricQuery.ilike('name', '%counselor%')
-    } else if (staffData.position_type === 'administrator') {
-      rubricQuery = rubricQuery.ilike('name', '%administrator%')
+    let rubricData = null
+
+    // Priority 1: Use assigned_rubric_id if set
+    if (staffData.assigned_rubric_id) {
+      const { data, error } = await supabase
+        .from('rubrics')
+        .select('*')
+        .eq('id', staffData.assigned_rubric_id)
+        .single()
+
+      if (!error && data) {
+        rubricData = data
+      }
     }
-    
-    const { data: rubricData } = await rubricQuery.limit(1).single()
-    
+
+    // Priority 2: Fallback to staff_type/position matching
+    if (!rubricData) {
+      let rubricQuery = supabase
+        .from('rubrics')
+        .select('*')
+        .eq('staff_type', staffData.staff_type)
+        .eq('is_active', true)
+
+      if (staffData.position_type === 'teacher') {
+        rubricQuery = rubricQuery.ilike('name', '%teacher%')
+      } else if (staffData.position_type === 'counselor') {
+        rubricQuery = rubricQuery.ilike('name', '%counselor%')
+      } else if (staffData.position_type === 'administrator') {
+        rubricQuery = rubricQuery.ilike('name', '%administrator%')
+      }
+
+      const { data } = await rubricQuery.limit(1).single()
+      rubricData = data
+    }
+
     if (rubricData) {
       setRubric(rubricData)
-      
+
       // Fetch domains
       const { data: domainData } = await supabase
         .from('rubric_domains')
         .select('*')
         .eq('rubric_id', rubricData.id)
         .order('sort_order')
-      
+
       if (domainData) {
         setDomains(domainData)
-        
+
         // Fetch standards
         const domainIds = domainData.map(d => d.id)
         const { data: standardData } = await supabase
@@ -99,7 +117,7 @@ function SummativeEvaluation() {
           .select('*')
           .in('domain_id', domainIds)
           .order('sort_order')
-        
+
         if (standardData) {
           setStandards(standardData)
         }
@@ -311,11 +329,6 @@ function SummativeEvaluation() {
     })
   }
 
-  const handleLogout = async () => {
-    await signOut()
-    window.location.href = '/login'
-  }
-
   const overallScore = calculateOverallScore()
   const overallRating = getOverallRating(overallScore)
   const isSubmitted = evaluation?.status === 'pending_staff_signature' || evaluation?.status === 'completed'
@@ -344,27 +357,7 @@ function SummativeEvaluation() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Top Navigation */}
-      <nav className="bg-[#2c3e7e] shadow">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-8">
-            <h1 className="text-xl font-bold text-white">StaffTrak</h1>
-            <a href="/summatives" className="text-white hover:text-gray-200">
-              ← Back to Summatives
-            </a>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-white">{profile?.full_name}</span>
-            <button
-              onClick={handleLogout}
-              className="bg-white text-[#2c3e7e] px-4 py-2 rounded-lg hover:bg-gray-100"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </nav>
-
+      <Navbar />
       {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-4">
