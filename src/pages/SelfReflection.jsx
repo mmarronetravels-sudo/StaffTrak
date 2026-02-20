@@ -24,30 +24,49 @@ function SelfReflection() {
     }
   }, [profile])
 
-  const fetchRubricAndReflection = async () => {
-    let rubricName = ''
-    if (profile.staff_type === 'licensed') {
-      if (profile.position_type === 'counselor') {
-        rubricName = 'School Counselor Rubric'
-      } else if (profile.position_type === 'administrator') {
-        rubricName = 'Administrator/Educational Leader Rubric'
-      } else {
-        rubricName = 'Teacher Rubric (NSQOT-Based)'
+ const fetchRubricAndReflection = async () => {
+    let rubricData = null
+
+    // Priority 1: Use assigned_rubric_id if set
+    if (profile.assigned_rubric_id) {
+      const { data, error } = await supabase
+        .from('rubrics')
+        .select('*')
+        .eq('id', profile.assigned_rubric_id)
+        .single()
+
+      if (!error && data) {
+        rubricData = data
       }
-    } else {
-      rubricName = 'Non-Licensed 4-Domain Rubric'
     }
 
-    const { data: rubricData, error: rubricError } = await supabase
-      .from('rubrics')
-      .select('*')
-      .eq('name', rubricName)
-      .single()
+    // Priority 2: Fallback to staff_type/position matching
+    if (!rubricData) {
+      let rubricName = ''
+      if (profile.staff_type === 'licensed') {
+        if (profile.position_type === 'counselor') {
+          rubricName = 'School Counselor Rubric'
+        } else if (profile.position_type === 'administrator') {
+          rubricName = 'Administrator/Educational Leader Rubric'
+        } else {
+          rubricName = 'Teacher Rubric (NSQOT-Based)'
+        }
+      } else {
+        rubricName = 'Non-Licensed 4-Domain Rubric'
+      }
 
-    if (rubricError || !rubricData) {
-      console.error('Error fetching rubric:', rubricError)
-      setLoading(false)
-      return
+      const { data, error } = await supabase
+        .from('rubrics')
+        .select('*')
+        .eq('name', rubricName)
+        .single()
+
+      if (error || !data) {
+        console.error('Error fetching rubric:', error)
+        setLoading(false)
+        return
+      }
+      rubricData = data
     }
 
     setRubric(rubricData)
@@ -199,10 +218,6 @@ function SelfReflection() {
     }
   }
 
-  const handleLogout = async () => {
-    await signOut()
-    window.location.href = '/login'
-  }
 
   const isSubmitted = existingReflection?.submitted_at ? true : false
 
