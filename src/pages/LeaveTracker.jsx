@@ -34,6 +34,21 @@ function LeaveTracker() {
     { keyword: 'bereavement', label: 'Bereavement', minDays: 0, source: 'Oregon State — Day 1' },
   ]
 
+  // Get eligibility warnings for a single staff member (used on cards)
+  const getStaffEligibilityWarnings = (staffMember) => {
+    if (!staffMember.hire_date) return []
+    const tenure = calculateTenure(staffMember.hire_date)
+    if (!tenure) return []
+    return ELIGIBILITY_RULES
+      .filter(rule => rule.minDays > 0 && tenure.totalDays < rule.minDays)
+      .map(rule => ({
+        label: rule.label,
+        daysRemaining: rule.minDays - tenure.totalDays,
+        totalRequired: rule.minDays,
+        daysSoFar: tenure.totalDays
+      }))
+  }
+
   // Calculate tenure from hire date
   const calculateTenure = (hireDate) => {
     if (!hireDate) return null
@@ -539,6 +554,18 @@ function LeaveTracker() {
                       </div>
                     </div>
 
+                    {/* Eligibility Warnings */}
+                    {getStaffEligibilityWarnings(s).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {getStaffEligibilityWarnings(s).map(w => (
+                          <span key={w.label} className="inline-flex items-center gap-1 text-xs bg-yellow-50 border border-yellow-300 text-yellow-800 px-2 py-1 rounded">
+                            <span className="text-yellow-600">⚠</span>
+                            <span className="font-medium">{w.label}:</span> {w.daysSoFar} of {w.totalRequired} days ({w.daysRemaining} remaining)
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    
                     {/* School-Provided Balances */}
                     <div className="space-y-2">
                       {schoolProvided.map(b => {
