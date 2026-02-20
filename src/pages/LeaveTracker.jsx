@@ -17,12 +17,106 @@ function LeaveTracker() {
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState('all')
-  const [schoolYear, setSchoolYear] = useState('2025-2026')
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [editingEntry, setEditingEntry] = useState(null)
+  const [schoolYear] = useState('2025-2026')
+  const [showHireDateModal, setShowHireDateModal] = useState(false)
+  const [hireDateStaff, setHireDateStaff] = useState(null)
+  const [hireDateValue, setHireDateValue] = useState('')
 
-  // Available school years
-  const schoolYears = ['2024-2025', '2025-2026', '2026-2027']
+  const HOURS_PER_DAY = 8
+
+  // Eligibility rules
+  const ELIGIBILITY_RULES = [
+    { keyword: 'fmla', label: 'FMLA', minDays: 365, source: 'Federal — 12 months + 1,250 hours worked' },
+    { keyword: 'ofla', label: 'OFLA', minDays: 180, source: 'Oregon State — 180 days of employment' },
+    { keyword: 'plo', label: 'PLO', minDays: 0, source: 'Oregon State — Day 1, no waiting period' },
+    { keyword: 'paid leave oregon', label: 'PLO', minDays: 0, source: 'Oregon State — Day 1, no waiting period' },
+    { keyword: 'sick', label: 'Oregon Sick Time', minDays: 0, source: 'Oregon State — Day 1, accrual begins immediately' },
+    { keyword: 'bereavement', label: 'Bereavement', minDays: 0, source: 'Oregon State — Day 1' },
+  ]
+
+  // Calculate tenure from hire date
+  const calculateTenure = (hireDate) => {
+    if (!hireDate) return null
+    const hire = new Date(hireDate)
+    const now = new Date()
+    let years = now.getFullYear() - hire.getFullYear()
+    let months = now.getMonth() - hire.getMonth()
+    if (months < 0) { years--; months += 12 }
+    if (now.getDate() < hire.getDate()) { months--; if (months < 0) { years--; months += 12 } }
+    const totalDays = Math.floor((now - hire) / (1000 * 60 * 60 * 24))
+    return { years: Math.max(0, years), months: Math.max(0, months), totalDays }
+  }
+
+  const formatTenureShort = (hireDate) => {
+    const t = calculateTenure(hireDate)
+    if (!t) return null
+    if (t.years === 0 && t.months === 0) return '<1m'
+    if (t.years === 0) return `${t.months}m`
+    return `${t.years}y ${t.months}m`
+  }
+
+  const formatTenureLong = (hireDate) => {
+    const t = calculateTenure(hireDate)
+    if (!t) return 'Unknown'
+    if (t.years === 0 && t.months === 0) return 'Less than 1 month'
+    const parts = []
+    if (t.years > 0) parts.push(`${t.years} year${t.years !== 1 ? 's' : ''}`)
+    if (t.months > 0) parts.push(`${t.months} month${t.months !== 1 ? 's' : ''}`)
+    return parts.join(', ')
+  }
+
+  // Check eligibility for a leave type given hire date
+  const checkEligibility = (leaveTypeName, hireDate) => {
+    if (!hireDate) return { eligible: false, reason: 'No hire date set' }
+    const tenure = calculateTenure(hireDate)
+    if (!tenure) return { eligible: false, reason: 'Invalid hire date' }
+    const nameLower = leaveTypeName.toLowerCase()
+    for (const rule of ELIGIBILITY_RULES) {
+      if (nameLower.includes(rule.keyword)) {
+        if (tenure.totalDays >= rule.minDays) {
+          return { eligible: true, reason: `Eligible (${rule.source})` }
+        } else {
+          const daysNeeded = rule.minDays - tenure.totalDays
+          return { eligible: false, reason: `${daysNeeded} days until eligible (requires ${rule.minDays} days)` }
+        }
+      }
+    }
+    return { eligible: true, reason: 'No specific eligibility requirement' }
+  }
+
+  // Hire date edit handler
+  const handleSaveHireDate = async () => {
+    if (!hireDateStaff) return
+    const { error } = await supabase
+      .from('profiles')
+      .update({ hire_date: hireDateValue || null })
+      .eq('id', hireDateStaff.id)
+    if (error) {
+      alert('Error saving hire date: ' + error.message)
+      return
+    }
+    setStaff(prev => prev.map(s => s.id === hireDateStaff.id ? { ...s, hire_date: hireDateValue || null } : s))
+    if (selectedStaff?.id === hireDateStaff.id) {
+      setSelectedStaff(prev => ({ ...prev, hire_date: hireDateValue || null }))
+    }
+    setShowHireDateModal(false)
+    setHireDateStaff(null)
+    setHireDateValue('')
+  }
+
+  const openHireDateModal = (staffMember) => {
+    setHireDateStaff(staffMember)
+    setHireDateValue(staffMember.hire_date || '')
+    setShowHireDateModal(true)
+  }
+
+  // Format entry amount with conversion info
+  const formatEntryAmount = (amount, unit) => {
+    const amt = parseFloat(amount)
+    if (unit === 'hours') return `${amt} hrs (${(amt / HOURS_PER_DAY).toFixed(1)} days)`
+    if (unit === 'days') return `${amt} days (${amt * HOURS_PER_DAY} hrs)`
+    return `${amt} ${unit}`
+  }
 
   const [newEntry, setNewEntry] = useState({
     staff_id: '',
@@ -40,7 +134,7 @@ function LeaveTracker() {
     if (profile) {
       fetchAllData()
     }
-  }, [profile, schoolYear])
+  }, [profile])
 
   const fetchAllData = async () => {
     setLoading(true)
@@ -216,229 +310,6 @@ function LeaveTracker() {
     }
   }
 
-  // Open edit modal for an existing entry
-  const handleEditEntry = (entry) => {
-    setEditingEntry({
-      ...entry,
-      amount: entry.amount.toString()
-    })
-    setShowEditModal(true)
-  }
-
-  // Save edits to an existing entry
-  const handleUpdateEntry = async () => {
-    if (!editingEntry) return
-
-    const oldEntry = leaveEntries.find(e => e.id === editingEntry.id)
-    const amountDiff = parseFloat(editingEntry.amount) - parseFloat(oldEntry.amount)
-
-    const { data, error } = await supabase
-      .from('leave_entries')
-      .update({
-        leave_type_id: editingEntry.leave_type_id,
-        start_date: editingEntry.start_date,
-        end_date: editingEntry.end_date,
-        amount: parseFloat(editingEntry.amount),
-        tracking_unit: editingEntry.tracking_unit,
-        concurrent_leave_type_id: editingEntry.concurrent_leave_type_id || null,
-        reason: editingEntry.reason || null,
-        documentation_on_file: editingEntry.documentation_on_file
-      })
-      .eq('id', editingEntry.id)
-      .select()
-
-    if (error) {
-      alert('Error updating entry: ' + error.message)
-      return
-    }
-
-    // Update balance if amount or leave type changed
-    if (amountDiff !== 0 || oldEntry.leave_type_id !== editingEntry.leave_type_id) {
-      // Subtract from old type balance
-      if (oldEntry.leave_type_id !== editingEntry.leave_type_id) {
-        const oldBalance = leaveBalances.find(
-          b => b.staff_id === oldEntry.staff_id && b.leave_type_id === oldEntry.leave_type_id && b.school_year === schoolYear
-        )
-        if (oldBalance) {
-          const newUsed = Math.max(0, parseFloat(oldBalance.used) - parseFloat(oldEntry.amount))
-          await supabase.from('leave_balances').update({ used: newUsed }).eq('id', oldBalance.id)
-        }
-        // Add to new type balance
-        const newBalance = leaveBalances.find(
-          b => b.staff_id === editingEntry.staff_id && b.leave_type_id === editingEntry.leave_type_id && b.school_year === schoolYear
-        )
-        if (newBalance) {
-          const newUsed = parseFloat(newBalance.used) + parseFloat(editingEntry.amount)
-          await supabase.from('leave_balances').update({ used: newUsed }).eq('id', newBalance.id)
-        }
-      } else {
-        // Same type, just adjust amount
-        const balance = leaveBalances.find(
-          b => b.staff_id === editingEntry.staff_id && b.leave_type_id === editingEntry.leave_type_id && b.school_year === schoolYear
-        )
-        if (balance) {
-          const newUsed = Math.max(0, parseFloat(balance.used) + amountDiff)
-          await supabase.from('leave_balances').update({ used: newUsed }).eq('id', balance.id)
-        }
-      }
-    }
-
-    setShowEditModal(false)
-    setEditingEntry(null)
-    fetchAllData() // Refresh all data to get accurate balances
-  }
-
-  // Carry over balances from previous year
-  const handleCarryOver = async () => {
-    const yearParts = schoolYear.split('-')
-    const prevYear = `${parseInt(yearParts[0]) - 1}-${parseInt(yearParts[1]) - 1}`
-
-    // Fetch previous year balances
-    const { data: prevBalances } = await supabase
-      .from('leave_balances')
-      .select('*')
-      .eq('tenant_id', profile.tenant_id)
-      .eq('school_year', prevYear)
-
-    if (!prevBalances || prevBalances.length === 0) {
-      alert(`No balances found for ${prevYear}. Nothing to carry over.`)
-      return
-    }
-
-    let carried = 0
-    let skipped = 0
-
-    for (const prevBal of prevBalances) {
-      const policy = leavePolicies.find(p => p.leave_type_id === prevBal.leave_type_id)
-      const carryoverMax = policy?.carryover_max
-      
-      // Skip if no carryover allowed
-      if (carryoverMax === 0 || carryoverMax === null || carryoverMax === undefined) {
-        skipped++
-        continue
-      }
-
-      const allocated = parseFloat(prevBal.allocated) + parseFloat(prevBal.carried_over || 0)
-      const used = parseFloat(prevBal.used)
-      const unused = Math.max(0, allocated - used)
-      const carryAmount = carryoverMax > 0 ? Math.min(unused, carryoverMax) : unused
-
-      if (carryAmount <= 0) {
-        skipped++
-        continue
-      }
-
-      // Find or create current year balance
-      const existing = leaveBalances.find(
-        b => b.staff_id === prevBal.staff_id && b.leave_type_id === prevBal.leave_type_id
-      )
-
-      if (existing) {
-        await supabase
-          .from('leave_balances')
-          .update({ carried_over: carryAmount })
-          .eq('id', existing.id)
-      } else {
-        await supabase
-          .from('leave_balances')
-          .insert([{
-            tenant_id: profile.tenant_id,
-            staff_id: prevBal.staff_id,
-            leave_type_id: prevBal.leave_type_id,
-            school_year: schoolYear,
-            allocated: policy?.days_per_year || policy?.weeks_per_year || 0,
-            used: 0,
-            carried_over: carryAmount,
-            tracking_unit: policy?.tracking_unit || 'days'
-          }])
-      }
-      carried++
-    }
-
-    alert(`Carry-over complete: ${carried} balances updated, ${skipped} skipped (no carryover allowed or no unused leave).`)
-    fetchAllData()
-  }
-
-  // Export leave data to CSV
-  const handleExportCSV = () => {
-    const rows = [
-      ['Staff Name', 'Leave Type', 'Category', 'Start Date', 'End Date', 'Amount', 'Unit', 'Concurrent With', 'Documentation', 'Notes']
-    ]
-
-    const sortedEntries = [...leaveEntries].sort((a, b) => {
-      const nameA = getStaffName(a.staff_id)
-      const nameB = getStaffName(b.staff_id)
-      return nameA.localeCompare(nameB) || new Date(a.start_date) - new Date(b.start_date)
-    })
-
-    sortedEntries.forEach(entry => {
-      rows.push([
-        getStaffName(entry.staff_id),
-        getTypeName(entry.leave_type_id),
-        getTypeCategory(entry.leave_type_id),
-        entry.start_date,
-        entry.end_date,
-        entry.amount,
-        entry.tracking_unit,
-        entry.concurrent_leave_type_id ? getTypeName(entry.concurrent_leave_type_id) : '',
-        entry.documentation_on_file ? 'Yes' : 'No',
-        (entry.reason || '').replace(/,/g, ';').replace(/\n/g, ' ')
-      ])
-    })
-
-    const csvContent = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.setAttribute('href', url)
-    link.setAttribute('download', `leave_data_${schoolYear}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  // Export balances summary to CSV
-  const handleExportBalancesCSV = () => {
-    const rows = [
-      ['Staff Name', 'Role', 'Leave Type', 'Category', 'Allocated', 'Carried Over', 'Total Available', 'Used', 'Remaining', 'Unit']
-    ]
-
-    staff.forEach(s => {
-      const balances = getStaffBalances(s.id)
-      balances.forEach(b => {
-        const allocated = parseFloat(b.balance.allocated)
-        const carriedOver = parseFloat(b.balance.carried_over || 0)
-        const total = allocated + carriedOver
-        const used = parseFloat(b.balance.used)
-        const remaining = Math.max(0, total - used)
-        const unit = b.policy?.tracking_unit || 'days'
-
-        rows.push([
-          s.full_name,
-          s.role,
-          b.type.name,
-          b.type.category,
-          allocated,
-          carriedOver,
-          total,
-          used,
-          remaining,
-          unit
-        ])
-      })
-    })
-
-    const csvContent = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.setAttribute('href', url)
-    link.setAttribute('download', `leave_balances_${schoolYear}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
   // Open staff detail view and initialize balances if needed
   const handleViewStaff = async (staffMember) => {
     setSelectedStaff(staffMember)
@@ -533,59 +404,36 @@ function LeaveTracker() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
           <div>
             <h2 className="text-2xl font-bold text-[#2c3e7e]">Leave Tracker</h2>
-            <div className="flex items-center gap-3 mt-1">
-              <label className="text-[#666666] text-sm">School Year:</label>
-              <select
-                value={schoolYear}
-                onChange={(e) => setSchoolYear(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-1 text-sm font-medium text-[#2c3e7e] focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
-              >
-                {schoolYears.map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
+            <p className="text-[#666666] text-sm mt-1">School Year: {schoolYear}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={handleCarryOver}
-              className="bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
-              title="Carry over unused leave from previous year"
-            >
-              ↗ Carry Over
-            </button>
-            <div className="relative group">
-              <button
-                className="bg-[#477fc1] text-white px-3 py-2 rounded-lg hover:bg-[#2c3e7e] transition-colors text-sm"
-              >
-                ↓ Export CSV ▾
-              </button>
-              <div className="hidden group-hover:block absolute right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[180px]">
-                <button
-                  onClick={handleExportCSV}
-                  className="block w-full text-left px-4 py-2 text-sm text-[#2c3e7e] hover:bg-gray-50"
-                >
-                  Export Leave Entries
-                </button>
-                <button
-                  onClick={handleExportBalancesCSV}
-                  className="block w-full text-left px-4 py-2 text-sm text-[#2c3e7e] hover:bg-gray-50"
-                >
-                  Export Balances Summary
-                </button>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowEntryModal(true)}
-              className="bg-[#2c3e7e] text-white px-4 py-2 rounded-lg hover:bg-[#477fc1] transition-colors text-sm"
-            >
-              + Log Leave Entry
-            </button>
-          </div>
+          <button
+            onClick={() => setShowEntryModal(true)}
+            className="bg-[#2c3e7e] text-white px-4 py-2 rounded-lg hover:bg-[#477fc1] transition-colors"
+          >
+            + Log Leave Entry
+          </button>
         </div>
 
+        {/* Missing Hire Date Alert */}
+        {staff.filter(s => !s.hire_date).length > 0 && (
+          <div className="bg-orange-50 border border-orange-300 rounded-lg p-3 mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-orange-600 text-lg">⚠</span>
+              <p className="text-sm text-orange-800">
+                <span className="font-medium">{staff.filter(s => !s.hire_date).length} staff member{staff.filter(s => !s.hire_date).length !== 1 ? 's' : ''}</span> missing hire dates — eligibility for FMLA, OFLA, and other leave types cannot be determined.
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveTab('eligibility')}
+              className="text-xs bg-orange-100 text-orange-800 px-3 py-1 rounded hover:bg-orange-200"
+            >
+              View Details
+            </button>
+          </div>
+        )}
+
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg shadow border-l-4 border-[#2c3e7e]">
             <p className="text-[#666666] text-sm">Total Staff</p>
             <p className="text-2xl font-bold text-[#2c3e7e]">{totalStaff}</p>
@@ -602,6 +450,10 @@ function LeaveTracker() {
             <p className="text-[#666666] text-sm">Approaching Limits</p>
             <p className="text-2xl font-bold text-[#f3843e]">{staffApproachingLimits}</p>
           </div>
+          <div className="bg-white p-4 rounded-lg shadow border-l-4 border-orange-400">
+            <p className="text-[#666666] text-sm">Missing Hire Date</p>
+            <p className="text-2xl font-bold text-orange-500">{staff.filter(s => !s.hire_date).length}</p>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -609,7 +461,7 @@ function LeaveTracker() {
           {[
             { id: 'dashboard', label: 'Staff Overview' },
             { id: 'entries', label: 'All Entries' },
-            { id: 'reports', label: 'Usage Reports' },
+            { id: 'eligibility', label: 'Eligibility' },
             { id: 'compliance', label: 'Compliance Notes' }
           ].map(tab => (
             <button
@@ -655,6 +507,21 @@ function LeaveTracker() {
                       <div>
                         <h3 className="font-semibold text-[#2c3e7e]">{s.full_name}</h3>
                         <p className="text-sm text-[#666666]">{s.position_type || s.role}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {s.hire_date ? (
+                            <span className="text-xs text-[#666666]">
+                              Hired: {new Date(s.hire_date).toLocaleDateString()} ({formatTenureShort(s.hire_date)})
+                            </span>
+                          ) : (
+                            <span className="text-xs text-orange-600">No hire date</span>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openHireDateModal(s) }}
+                            className="text-xs text-[#477fc1] hover:underline"
+                          >
+                            {s.hire_date ? 'Edit' : 'Add'}
+                          </button>
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -789,7 +656,7 @@ function LeaveTracker() {
                           {new Date(entry.start_date).toLocaleDateString()} â€“ {new Date(entry.end_date).toLocaleDateString()}
                         </td>
                         <td className="px-4 py-3 text-sm text-[#666666]">
-                          {entry.amount} {entry.tracking_unit}
+                          {formatEntryAmount(entry.amount, entry.tracking_unit)}
                         </td>
                         <td className="px-4 py-3 text-sm text-[#666666]">
                           {entry.concurrent_leave_type_id ? (
@@ -806,20 +673,12 @@ function LeaveTracker() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEditEntry(entry)}
-                              className="text-[#477fc1] hover:text-[#2c3e7e] text-xs font-medium"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleDeleteEntry(entry)}
-                              className="text-red-500 hover:text-red-700 text-xs"
-                            >
-                              Delete
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => handleDeleteEntry(entry)}
+                            className="text-red-500 hover:text-red-700 text-xs"
+                          >
+                            Delete
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -835,97 +694,79 @@ function LeaveTracker() {
           </div>
         )}
 
-        {/* Tab: Usage Reports */}
-        {activeTab === 'reports' && (
-          <div className="space-y-6">
-            {/* Summary by Leave Type */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-[#2c3e7e] mb-4">Leave Usage by Type</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase">Leave Type</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase">Category</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase">Total Entries</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase">Staff Using</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase">Total Used</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {leaveTypes.map(lt => {
-                      const typeEntries = leaveEntries.filter(e => e.leave_type_id === lt.id)
-                      const uniqueStaff = [...new Set(typeEntries.map(e => e.staff_id))].length
-                      const totalUsed = typeEntries.reduce((sum, e) => sum + parseFloat(e.amount), 0)
-                      const policy = leavePolicies.find(p => p.leave_type_id === lt.id)
-                      const unit = policy?.tracking_unit || 'days'
-
-                      return (
-                        <tr key={lt.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-[#2c3e7e]">{lt.name}</td>
-                          <td className="px-4 py-3 text-sm">
-                            <span className={`px-2 py-0.5 rounded-full text-xs ${getCategoryColor(lt.category)}`}>
-                              {lt.category === 'school_provided' ? 'School' : lt.category === 'state' ? 'State' : 'Federal'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right text-[#666666]">{typeEntries.length}</td>
-                          <td className="px-4 py-3 text-sm text-right text-[#666666]">{uniqueStaff}</td>
-                          <td className="px-4 py-3 text-sm text-right font-medium text-[#2c3e7e]">
-                            {Math.round(totalUsed * 100) / 100} {unit}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+        {/* Tab: Eligibility */}
+        {activeTab === 'eligibility' && (
+          <div>
+            <div className="bg-white rounded-lg shadow overflow-x-auto mb-6">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase">Staff Member</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase">Hire Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase">Tenure</th>
+                    {ELIGIBILITY_RULES.filter((r, i, arr) => arr.findIndex(x => x.label === r.label) === i).map(rule => (
+                      <th key={rule.label} className="px-4 py-3 text-center text-xs font-medium text-[#666666] uppercase">{rule.label}</th>
+                    ))}
+                    <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {staff.map(s => {
+                    const uniqueRules = ELIGIBILITY_RULES.filter((r, i, arr) => arr.findIndex(x => x.label === r.label) === i)
+                    return (
+                      <tr key={s.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm font-medium text-[#2c3e7e]">{s.full_name}</td>
+                        <td className="px-4 py-3 text-sm text-[#666666]">
+                          {s.hire_date ? new Date(s.hire_date).toLocaleDateString() : (
+                            <span className="text-orange-600">Not set</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[#666666]">
+                          {s.hire_date ? formatTenureLong(s.hire_date) : '—'}
+                        </td>
+                        {uniqueRules.map(rule => {
+                          const eligibility = s.hire_date
+                            ? (calculateTenure(s.hire_date).totalDays >= rule.minDays
+                              ? { eligible: true }
+                              : { eligible: false })
+                            : { eligible: false }
+                          return (
+                            <td key={rule.label} className="px-4 py-3 text-center">
+                              {!s.hire_date ? (
+                                <span className="text-xs text-gray-400">—</span>
+                              ) : eligibility.eligible ? (
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">✓</span>
+                              ) : (
+                                <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">✗</span>
+                              )}
+                            </td>
+                          )
+                        })}
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => openHireDateModal(s)}
+                            className="text-xs text-[#477fc1] hover:underline"
+                          >
+                            {s.hire_date ? 'Edit Date' : 'Add Date'}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
 
-            {/* Staff with highest usage */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-[#2c3e7e] mb-4">Staff Leave Summary</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase">Staff</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-[#666666] uppercase">Role</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase">Entries</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase">Total Days Used</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-[#666666] uppercase">School Leave Remaining</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {staff
-                      .map(s => {
-                        const entries = getStaffEntries(s.id)
-                        const totalDaysUsed = entries
-                          .filter(e => leaveTypes.find(t => t.id === e.leave_type_id)?.category === 'school_provided')
-                          .reduce((sum, e) => sum + parseFloat(e.amount), 0)
-                        const balances = getStaffBalances(s.id)
-                        const schoolBalances = balances.filter(b => b.type.category === 'school_provided')
-                        const totalRemaining = schoolBalances.reduce((sum, b) => {
-                          const allocated = parseFloat(b.balance.allocated) + parseFloat(b.balance.carried_over || 0)
-                          return sum + Math.max(0, allocated - parseFloat(b.balance.used))
-                        }, 0)
-                        return { ...s, entryCount: entries.length, totalDaysUsed, totalRemaining }
-                      })
-                      .sort((a, b) => b.totalDaysUsed - a.totalDaysUsed)
-                      .map(s => (
-                        <tr key={s.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-[#2c3e7e]">{s.full_name}</td>
-                          <td className="px-4 py-3 text-sm text-[#666666] capitalize">{s.position_type?.replace(/_/g, ' ') || s.role}</td>
-                          <td className="px-4 py-3 text-sm text-right text-[#666666]">{s.entryCount}</td>
-                          <td className="px-4 py-3 text-sm text-right font-medium text-[#2c3e7e]">
-                            {Math.round(s.totalDaysUsed * 100) / 100}
-                          </td>
-                          <td className={`px-4 py-3 text-sm text-right font-medium ${s.totalRemaining <= 2 ? 'text-red-600' : 'text-green-600'}`}>
-                            {Math.round(s.totalRemaining * 100) / 100}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+            {/* Eligibility Requirements Reference */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <h4 className="font-semibold text-[#2c3e7e] mb-3">Eligibility Requirements Reference</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {ELIGIBILITY_RULES.filter((r, i, arr) => arr.findIndex(x => x.label === r.label) === i).map(rule => (
+                  <div key={rule.label} className="flex items-start gap-2 text-sm">
+                    <span className="font-medium text-[#2c3e7e] min-w-[80px]">{rule.label}:</span>
+                    <span className="text-[#666666]">{rule.minDays === 0 ? 'Eligible from Day 1' : `${rule.minDays} days of employment required`} — {rule.source}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -1065,21 +906,59 @@ function LeaveTracker() {
                   </div>
                 </div>
 
-                {/* Amount */}
+                {/* Amount + Unit */}
                 <div>
                   <label className="block text-sm font-medium text-[#666666] mb-1">
-                    Amount ({newEntry.tracking_unit}) *
+                    Amount *
                   </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={newEntry.amount}
-                    onChange={(e) => setNewEntry(prev => ({ ...prev, amount: e.target.value }))}
-                    placeholder={`Number of ${newEntry.tracking_unit}`}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step={newEntry.tracking_unit === 'hours' ? '0.25' : '0.5'}
+                      min="0"
+                      value={newEntry.amount}
+                      onChange={(e) => setNewEntry(prev => ({ ...prev, amount: e.target.value }))}
+                      placeholder={`Number of ${newEntry.tracking_unit}`}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
+                    />
+                    <select
+                      value={newEntry.tracking_unit}
+                      onChange={(e) => setNewEntry(prev => ({ ...prev, tracking_unit: e.target.value }))}
+                      className="w-24 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
+                    >
+                      <option value="hours">Hours</option>
+                      <option value="days">Days</option>
+                      <option value="weeks">Weeks</option>
+                    </select>
+                  </div>
+                  {newEntry.amount && newEntry.tracking_unit === 'hours' && (
+                    <p className="text-xs text-[#666666] mt-1">= {(parseFloat(newEntry.amount) / HOURS_PER_DAY).toFixed(2)} days</p>
+                  )}
+                  {newEntry.amount && newEntry.tracking_unit === 'days' && (
+                    <p className="text-xs text-[#666666] mt-1">= {parseFloat(newEntry.amount) * HOURS_PER_DAY} hours</p>
+                  )}
+                  {newEntry.amount && newEntry.tracking_unit === 'weeks' && (
+                    <p className="text-xs text-[#666666] mt-1">= {parseFloat(newEntry.amount) * 5} days ({parseFloat(newEntry.amount) * 5 * HOURS_PER_DAY} hours)</p>
+                  )}
                 </div>
+
+                {/* Eligibility Warning */}
+                {newEntry.staff_id && newEntry.leave_type_id && (() => {
+                  const staffMember = staff.find(s => s.id === newEntry.staff_id)
+                  const leaveType = leaveTypes.find(t => t.id === newEntry.leave_type_id)
+                  if (!staffMember || !leaveType) return null
+                  const elig = checkEligibility(leaveType.name, staffMember.hire_date)
+                  if (elig.eligible) return null
+                  return (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-xs font-medium text-red-800">⚠ Eligibility Warning</p>
+                      <p className="text-xs text-red-700 mt-1">
+                        {staffMember.full_name} may not be eligible for {leaveType.name}: {elig.reason}
+                      </p>
+                      <p className="text-xs text-red-600 mt-1">You can still log this entry, but please verify eligibility.</p>
+                    </div>
+                  )
+                })()}
 
                 {/* Concurrent Leave */}
                 <div>
@@ -1149,7 +1028,22 @@ function LeaveTracker() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h3 className="text-lg font-bold text-[#2c3e7e]">{selectedStaff.full_name}</h3>
-                  <p className="text-sm text-[#666666]">{selectedStaff.position_type || selectedStaff.role} â€” {schoolYear}</p>
+                  <p className="text-sm text-[#666666]">{selectedStaff.position_type || selectedStaff.role} </p>{schoolYear}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    {selectedStaff.hire_date ? (
+                      <span className="text-xs text-[#666666]">
+                        Hired: {new Date(selectedStaff.hire_date).toLocaleDateString()} \u2014 Tenure: {formatTenureLong(selectedStaff.hire_date)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-orange-600">No hire date set</span>
+                    )}
+                    <button
+                      onClick={() => openHireDateModal(selectedStaff)}
+                      className="text-xs text-[#477fc1] hover:underline"
+                    >
+                      {selectedStaff.hire_date ? 'Edit' : 'Add'}
+                    </button>
+                  </div>
                 </div>
                 <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
               </div>
@@ -1214,7 +1108,7 @@ function LeaveTracker() {
                           </span>
                         </div>
                         <p className="text-sm text-[#2c3e7e] font-medium mt-1">
-                          {entry.amount} {entry.tracking_unit}
+                          {formatEntryAmount(entry.amount, entry.tracking_unit)}
                           {entry.concurrent_leave_type_id && (
                             <span className="text-xs text-yellow-700 ml-2">
                               (concurrent with {getTypeName(entry.concurrent_leave_type_id)})
@@ -1224,16 +1118,7 @@ function LeaveTracker() {
                         {entry.reason && <p className="text-xs text-[#666666] mt-1">{entry.reason}</p>}
                       </div>
                       <div className="flex items-center gap-2">
-                        {entry.documentation_on_file && <span className="text-green-600 text-xs">Docs ✓</span>}
-                        <button
-                          onClick={() => {
-                            setShowDetailModal(false)
-                            handleEditEntry(entry)
-                          }}
-                          className="text-[#477fc1] hover:text-[#2c3e7e] text-xs font-medium"
-                        >
-                          Edit
-                        </button>
+                        {entry.documentation_on_file && <span className="text-green-600 text-xs">Docs âœ“</span>}
                         <button
                           onClick={() => handleDeleteEntry(entry)}
                           className="text-red-400 hover:text-red-600 text-xs"
@@ -1261,147 +1146,48 @@ function LeaveTracker() {
         </div>
       )}
 
-      {/* Modal: Edit Leave Entry */}
-      {showEditModal && editingEntry && (
+      {/* Modal: Edit Hire Date */}
+      {showHireDateModal && hireDateStaff && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-[#2c3e7e]">Edit Leave Entry</h3>
-                <button onClick={() => { setShowEditModal(false); setEditingEntry(null) }} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+                <h3 className="text-lg font-bold text-[#2c3e7e]">Edit Hire Date</h3>
+                <button onClick={() => setShowHireDateModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
               </div>
 
-              <div className="space-y-4">
-                {/* Staff Member (read-only) */}
-                <div>
-                  <label className="block text-sm font-medium text-[#666666] mb-1">Staff Member</label>
-                  <div className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-[#2c3e7e] font-medium">
-                    {getStaffName(editingEntry.staff_id)}
-                  </div>
-                </div>
+              <p className="text-sm text-[#666666] mb-4">{hireDateStaff.full_name}</p>
 
-                {/* Leave Type */}
-                <div>
-                  <label className="block text-sm font-medium text-[#666666] mb-1">Leave Type *</label>
-                  <select
-                    value={editingEntry.leave_type_id}
-                    onChange={(e) => {
-                      const policy = leavePolicies.find(p => p.leave_type_id === e.target.value)
-                      setEditingEntry(prev => ({
-                        ...prev,
-                        leave_type_id: e.target.value,
-                        tracking_unit: policy?.tracking_unit || 'days'
-                      }))
-                    }}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
-                  >
-                    <optgroup label="School-Provided">
-                      {leaveTypes.filter(t => t.category === 'school_provided').map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Federal">
-                      {leaveTypes.filter(t => t.category === 'federal').map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Oregon State">
-                      {leaveTypes.filter(t => t.category === 'state').map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </optgroup>
-                  </select>
-                </div>
-
-                {/* Date Range */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-[#666666] mb-1">Start Date *</label>
-                    <input
-                      type="date"
-                      value={editingEntry.start_date}
-                      onChange={(e) => setEditingEntry(prev => ({ ...prev, start_date: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[#666666] mb-1">End Date *</label>
-                    <input
-                      type="date"
-                      value={editingEntry.end_date}
-                      onChange={(e) => setEditingEntry(prev => ({ ...prev, end_date: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
-                    />
-                  </div>
-                </div>
-
-                {/* Amount */}
-                <div>
-                  <label className="block text-sm font-medium text-[#666666] mb-1">
-                    Amount ({editingEntry.tracking_unit}) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={editingEntry.amount}
-                    onChange={(e) => setEditingEntry(prev => ({ ...prev, amount: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
-                  />
-                </div>
-
-                {/* Concurrent Leave */}
-                <div>
-                  <label className="block text-sm font-medium text-[#666666] mb-1">Running Concurrently With (optional)</label>
-                  <select
-                    value={editingEntry.concurrent_leave_type_id || ''}
-                    onChange={(e) => setEditingEntry(prev => ({ ...prev, concurrent_leave_type_id: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
-                  >
-                    <option value="">None</option>
-                    {leaveTypes.filter(t => t.id !== editingEntry.leave_type_id).map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Reason */}
-                <div>
-                  <label className="block text-sm font-medium text-[#666666] mb-1">Notes / Reason (optional)</label>
-                  <textarea
-                    value={editingEntry.reason || ''}
-                    onChange={(e) => setEditingEntry(prev => ({ ...prev, reason: e.target.value }))}
-                    rows={2}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
-                  />
-                </div>
-
-                {/* Documentation */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="editDocs"
-                    checked={editingEntry.documentation_on_file}
-                    onChange={(e) => setEditingEntry(prev => ({ ...prev, documentation_on_file: e.target.checked }))}
-                    className="rounded border-gray-300"
-                  />
-                  <label htmlFor="editDocs" className="text-sm text-[#666666]">Documentation on file</label>
-                </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[#666666] mb-1">Hire Date</label>
+                <input
+                  type="date"
+                  value={hireDateValue}
+                  onChange={(e) => setHireDateValue(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
+                />
               </div>
 
-              {/* Actions */}
-              <div className="flex justify-end gap-3 mt-6">
+              {hireDateValue && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <p className="text-xs font-medium text-blue-800">Tenure Preview</p>
+                  <p className="text-sm text-blue-700 mt-1">{formatTenureLong(hireDateValue)}</p>
+                  <p className="text-xs text-blue-600 mt-1">{calculateTenure(hireDateValue)?.totalDays || 0} total days</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
                 <button
-                  onClick={() => { setShowEditModal(false); setEditingEntry(null) }}
+                  onClick={() => setShowHireDateModal(false)}
                   className="px-4 py-2 text-sm text-[#666666] border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleUpdateEntry}
+                  onClick={handleSaveHireDate}
                   className="px-4 py-2 text-sm bg-[#2c3e7e] text-white rounded-lg hover:bg-[#477fc1] transition-colors"
                 >
-                  Save Changes
+                  Save
                 </button>
               </div>
             </div>
