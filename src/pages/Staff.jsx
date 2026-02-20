@@ -6,6 +6,7 @@ function Staff() {
   const { profile, signOut } = useAuth()
   const [staff, setStaff] = useState([])
   const [evaluators, setEvaluators] = useState([])
+  const [rubrics, setRubrics] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showViewModal, setShowViewModal] = useState(false)
@@ -30,6 +31,7 @@ function Staff() {
     if (profile) {
       fetchStaff()
       fetchEvaluators()
+      fetchRubrics()
     }
   }, [profile])
 
@@ -58,6 +60,19 @@ function Staff() {
 
     if (!error) {
       setEvaluators(data)
+    }
+  }
+
+  const fetchRubrics = async () => {
+    const { data, error } = await supabase
+      .from('rubrics')
+      .select('id, name, staff_type')
+      .eq('tenant_id', profile.tenant_id)
+      .eq('is_active', true)
+      .order('name')
+
+    if (!error) {
+      setRubrics(data)
     }
   }
 
@@ -120,6 +135,7 @@ function Staff() {
         hire_date: selectedStaff.hire_date,
         years_at_school: selectedStaff.years_at_school,
         evaluator_id: selectedStaff.evaluator_id || null,
+        assigned_rubric_id: selectedStaff.assigned_rubric_id || null,
         is_active: selectedStaff.is_active
       })
       .eq('id', selectedStaff.id)
@@ -867,6 +883,24 @@ function Staff() {
                       <option value="">Select Evaluator</option>
                       {evaluators.map(ev => (
                         <option key={ev.id} value={ev.id}>{ev.full_name}</option>
+                      ))}
+                  </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-[#666666] mb-1">
+                      Assigned Rubric
+                    </label>
+                    <select
+                      value={selectedStaff.assigned_rubric_id || ''}
+                      onChange={(e) => setSelectedStaff({...selectedStaff, assigned_rubric_id: e.target.value || null})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
+                    >
+                      <option value="">— Select Rubric —</option>
+                      {rubrics.map(r => (
+                        <option key={r.id} value={r.id}>
+                          {r.name} ({r.staff_type})
+                        </option>
                       ))}
                     </select>
                   </div>
