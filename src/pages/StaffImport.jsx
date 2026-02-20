@@ -110,6 +110,12 @@ function StaffImport() {
     if (p.includes('translator') || p.includes('school support')) return 'translator'
     if (p.includes('community')) return 'community_partnerships'
     
+   // Add these new mappings:
+if (p.includes('va advisor') || p.includes('virtual academy')) return 'va_advisor'
+if (p.includes('ec counselor') || p.includes('early childhood')) return 'ec_counselor'
+if (p.includes('student support specialist')) return 'student_support_specialist'
+if (p.includes('cultural liaison')) return 'cultural_liaison'
+    
     // Default based on staff type
     return staffType === 'licensed' ? 'teacher' : 'advisor'
   }
@@ -530,13 +536,12 @@ function StaffImport() {
                               className="px-1 py-0.5 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#477fc1]"
                             >
                               <optgroup label="Licensed">
-                                {['teacher', 'school_counselor', 'principal', 'assistant_principal', 'director', 'case_manager', 'special_education_director', 'curriculum_specialist', 'instructional_coach'].map(p => (
+                                {['teacher', 'school_counselor', 'ec_counselor', 'principal', 'assistant_principal', 'director', 'case_manager', 'special_education_director', 'curriculum_specialist', 'instructional_coach', 'student_support_specialist'].map(p => (
                                   <option key={p} value={p}>{p.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
                                 ))}
                               </optgroup>
                               <optgroup label="Classified">
-                                {['advisor', 'student_support', 'paraprofessional', 'secretary', 'registrar', 'receptionist', 'office_manager', 'technology_lead', 'translator', 'community_partnerships', 'executive_assistant', 'bookkeeper'].map(p => (
-                                  <option key={p} value={p}>{p.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+{['advisor', 'va_advisor', 'student_support', 'cultural_liaison', 'paraprofessional', 'secretary', 'registrar', 'receptionist', 'office_manager', 'technology_lead', 'translator', 'community_partnerships', 'executive_assistant', 'bookkeeper'].map(p => (                                  <option key={p} value={p}>{p.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
                                 ))}
                               </optgroup>
                             </select>
