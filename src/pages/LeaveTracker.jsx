@@ -654,9 +654,6 @@ function LeaveTracker() {
     return results
   }
 
-  // Compute protected leave summary for a staff card
-  const getProtectedLeaveSummary = (staffId) => {
-
   // Get eligibility alerts for a specific staff member
   const getStaffEligibilityAlerts = (staffMember) => {
     if (!staffMember.hire_date) return []
@@ -674,6 +671,9 @@ function LeaveTracker() {
     })
     return alerts
   }
+
+  // Compute protected leave summary for a staff card
+  const getProtectedLeaveSummary = (staffId) => {
     return leaveTypes
       .filter(lt => isProtectedLeaveType(lt.name))
       .map(lt => {
