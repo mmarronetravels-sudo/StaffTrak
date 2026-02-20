@@ -656,6 +656,24 @@ function LeaveTracker() {
 
   // Compute protected leave summary for a staff card
   const getProtectedLeaveSummary = (staffId) => {
+
+  // Get eligibility alerts for a specific staff member
+  const getStaffEligibilityAlerts = (staffMember) => {
+    if (!staffMember.hire_date) return []
+    const tenure = calculateTenure(staffMember.hire_date)
+    if (!tenure) return []
+    const alerts = []
+    ELIGIBILITY_RULES.forEach(rule => {
+      if (rule.minDays === 0) return
+      if (tenure.totalDays < rule.minDays) {
+        alerts.push({
+          ruleLabel: rule.label,
+          daysRemaining: rule.minDays - tenure.totalDays
+        })
+      }
+    })
+    return alerts
+  }
     return leaveTypes
       .filter(lt => isProtectedLeaveType(lt.name))
       .map(lt => {
@@ -751,31 +769,6 @@ function LeaveTracker() {
           </div>
         </div>
 
-        {/* FMLA/OFLA Eligibility Alert */}
-        {getIneligibleStaff().length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-6">
-            <div className="flex items-start gap-2 mb-2">
-              <span className="text-yellow-600 text-lg">⚠</span>
-              <p className="text-sm font-semibold text-yellow-800">
-                {getIneligibleStaff().length} eligibility alert{getIneligibleStaff().length !== 1 ? 's' : ''} — Staff not yet eligible for protected leave
-              </p>
-            </div>
-            <div className="ml-6 space-y-1">
-              {getIneligibleStaff().map((item, idx) => (
-                <div key={`${item.staffId}-${item.ruleLabel}-${idx}`} className="flex items-center gap-2 text-sm">
-                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                    item.ruleLabel === 'FMLA' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
-                  }`}>{item.ruleLabel}</span>
-                  <span className="text-yellow-900">
-                    <span className="font-medium">{item.staffName}</span>
-                    {' — '}{item.daysRemaining} day{item.daysRemaining !== 1 ? 's' : ''} until eligible
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Tabs */}
         <div className="flex gap-2 mb-6 border-b border-gray-200">
           {[
@@ -816,6 +809,7 @@ function LeaveTracker() {
                 const entries = getStaffEntries(s.id)
                 const tenure = formatTenureShort(s.hire_date)
                 const contractDays = getContractDays(s.id)
+                const eligibilityAlerts = getStaffEligibilityAlerts(s)
 
                 return (
                   <div key={s.id} className="bg-white rounded-lg shadow p-4">
@@ -832,6 +826,16 @@ function LeaveTracker() {
                             </span>
                           )}
                         </div>
+                        {eligibilityAlerts.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {eligibilityAlerts.map((alert, idx) => (
+                              <span key={idx} className="inline-flex items-center gap-1 text-xs bg-yellow-50 border border-yellow-200 text-yellow-800 px-2 py-0.5 rounded">
+                                <span className="font-medium">{alert.ruleLabel}</span>
+                                <span className="text-yellow-600">— {alert.daysRemaining}d until eligible</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <button
