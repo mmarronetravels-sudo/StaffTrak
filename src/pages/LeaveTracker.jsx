@@ -1028,7 +1028,7 @@ function LeaveTracker() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h3 className="text-lg font-bold text-[#2c3e7e]">{selectedStaff.full_name}</h3>
-                  <p className="text-sm text-[#666666]">{selectedStaff.position_type || selectedStaff.role} </p>{schoolYear}</p>
+                  <p className="text-sm text-[#666666]">{selectedStaff.position_type || selectedStaff.role} &mdash; {schoolYear}</p>
                   <div className="flex items-center gap-2 mt-1">
                     {selectedStaff.hire_date ? (
                       <span className="text-xs text-[#666666]">
