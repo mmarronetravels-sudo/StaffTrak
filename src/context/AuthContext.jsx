@@ -9,48 +9,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for token handoff from product switcher
-    const params = new URLSearchParams(window.location.search);
-    const accessToken = params.get('token');
-    const refreshToken = params.get('refresh');
-
-    if (accessToken && refreshToken) {
-  window.history.replaceState({}, '', window.location.pathname);
-  supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-    .then(async ({ data: { session }, error }) => {
-      if (session?.user) {
-        setUser(session.user);
-        fetchProfile(session.user.id);
-      } else {
-        const { data: { session: refreshed } } = await supabase.auth.refreshSession({ refresh_token: refreshToken });
-        if (refreshed?.user) {
-          setUser(refreshed.user);
-          fetchProfile(refreshed.user.id);
-        } else {
-          console.error('Token handoff failed:', error);
-          window.location.href = '/login';
-        }
-      }
-    });
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    setUser(session?.user ?? null);
-    if (session?.user) {
-      await fetchProfile(session.user.id);
-    } else {
-      setProfile(null);
-      setLoading(false);
-    }
-  });
-  return () => subscription.unsubscribe();
-}
-
-    // Normal session init
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      else setLoading(false);
-    });
-
+    // Set up auth state listener FIRST — always
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -60,6 +19,30 @@ export function AuthProvider({ children }) {
         setLoading(false);
       }
     });
+
+    // Check for token handoff from product switcher
+    const params = new URLSearchParams(window.location.search);
+    const accessToken = params.get('token');
+    const refreshToken = params.get('refresh');
+
+    if (accessToken && refreshToken) {
+      // Clean the tokens from the URL immediately
+      window.history.replaceState({}, '', window.location.pathname);
+      // setSession will trigger onAuthStateChange above
+      supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      }).catch(err => {
+        console.error('Token handoff failed:', err);
+        setLoading(false);
+      });
+    } else {
+      // Normal session init
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) setLoading(false);
+        // if session exists, onAuthStateChange will handle it
+      });
+    }
 
     return () => subscription.unsubscribe();
   }, []);
