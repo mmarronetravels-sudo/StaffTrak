@@ -56,7 +56,7 @@ export default function Navbar() {
     ]
   }
 
-  return (
+ return (
     <nav className="bg-[#2c3e7e] shadow">
       <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-8">
