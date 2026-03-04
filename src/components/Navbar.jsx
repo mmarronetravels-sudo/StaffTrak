@@ -15,8 +15,7 @@ export default function Navbar() {
         { href: '/dashboard', label: 'Dashboard' },
         { href: '/staff', label: 'Staff' },
         { href: '/leave-tracker', label: 'Leave Tracker' },
-{ href: '/ode-staff-position', label: 'ODE Position File' },
-
+        { href: '/ode-staff-position', label: 'ODE Position File' },
       ]
     }
     if (isAdmin || isEvaluator) {
@@ -28,9 +27,8 @@ export default function Navbar() {
         { href: '/summatives', label: 'Summatives' },
         { href: '/goal-approvals', label: 'Goal Approvals' },
         { href: '/leave-tracker', label: 'Leave Tracker' },
-{ href: '/ode-staff-position', label: 'ODE Position File' },
-{ href: '/reports', label: 'Reports' }
-        
+        { href: '/ode-staff-position', label: 'ODE Position File' },
+        { href: '/reports', label: 'Reports' }
       ]
     }
     return [
@@ -60,7 +58,16 @@ export default function Navbar() {
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Product Switcher */}
+          <a
+            href="https://timetrak.scholarpathsystems.org"
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[#2c3e7e] bg-[#f3843e] hover:bg-[#e07030] transition-colors"
+            title="Switch to TimeTrak"
+          >
+            <span>TimeTrak</span>
+            <span>→</span>
+          </a>
           {/* Username - hidden on mobile */}
           <span className="hidden md:block text-white">{profile?.full_name || user?.email}</span>
           {/* Logout - hidden on mobile */}
@@ -101,6 +108,12 @@ export default function Navbar() {
               {item.label}
             </a>
           ))}
+          <a
+            href="https://timetrak.scholarpathsystems.org"
+            className="block px-4 py-3 text-[#f3843e] hover:bg-[#477fc1] border-b border-[#477fc1]/30 font-semibold"
+          >
+            Switch to TimeTrak →
+          </a>
           <button
             onClick={handleLogout}
             className="block w-full text-left px-4 py-3 text-white hover:bg-[#477fc1]"
