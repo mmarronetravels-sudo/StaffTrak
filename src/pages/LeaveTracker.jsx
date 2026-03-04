@@ -109,13 +109,13 @@ function LeaveTracker() {
       .eq('school_year', schoolYear)
       .order('start_date', { ascending: false })
 
-    // Fetch protected leave periods (all active + recently expired)
+    // Fetch protected leave periods (all active + recently exhausted)
     const { data: periodsData } = await supabase
       .from('protected_leave_periods')
       .select('*')
       .eq('tenant_id', profile.tenant_id)
       .in('status', ['active', 'exhausted'])
-      .order('period_start_date', { ascending: false })
+      .order('period_start', { ascending: false })
 
     // Fetch ODE records for contract_length
     const { data: odeData } = await supabase
@@ -133,7 +133,7 @@ function LeaveTracker() {
       // Auto-expire periods that have passed their end date
       const now = new Date()
       const updated = (periodsData || []).map(p => {
-        if (p.status === 'active' && new Date(p.period_end_date) < now) {
+        if (p.status === 'active' && new Date(p.period_end) < now) {
           // Mark expired in DB asynchronously
           supabase.from('protected_leave_periods')
             .update({ status: 'expired' })
@@ -159,7 +159,7 @@ function LeaveTracker() {
 
   const getProratedEntitlement = (staffId) => {
     const contractDays = getContractDays(staffId)
-    if (!contractDays) return null // Unknown — can't calculate
+    if (!contractDays) return null
     const ratio = contractDays / FULL_TIME_DAYS
     return Math.round((ratio * BASE_ENTITLEMENT_HOURS) * 100) / 100
   }
@@ -174,18 +174,16 @@ function LeaveTracker() {
 
   // ── Protected Leave Period Logic ──────────────────────
 
-  // Get the active period for a staff + leave type, or null
   const getActivePeriod = (staffId, leaveTypeId) => {
     const now = new Date()
     return protectedPeriods.find(p =>
       p.staff_id === staffId &&
       p.leave_type_id === leaveTypeId &&
       p.status === 'active' &&
-      new Date(p.period_end_date) >= now
+      new Date(p.period_end) >= now
     ) || null
   }
 
-  // Get the most recent period (active or exhausted) for display
   const getLatestPeriod = (staffId, leaveTypeId) => {
     return protectedPeriods.find(p =>
       p.staff_id === staffId &&
@@ -193,25 +191,22 @@ function LeaveTracker() {
     ) || null
   }
 
-  // Create a new rolling period starting from the leave entry date
   const createProtectedPeriod = async (staffId, leaveTypeId, startDate) => {
     const contractDays = getContractDays(staffId) || FULL_TIME_DAYS
     const ratio = contractDays / FULL_TIME_DAYS
     const proratedHours = Math.round((ratio * BASE_ENTITLEMENT_HOURS) * 100) / 100
 
-    // Period end = start + 12 months
     const start = new Date(startDate)
     const end = new Date(start)
     end.setFullYear(end.getFullYear() + 1)
-    // Subtract one day so period is exactly 12 months (e.g., Feb 1 → Jan 31)
     end.setDate(end.getDate() - 1)
 
     const periodData = {
       tenant_id: profile.tenant_id,
       staff_id: staffId,
       leave_type_id: leaveTypeId,
-      period_start_date: startDate,
-      period_end_date: end.toISOString().split('T')[0],
+      period_start: startDate,
+      period_end: end.toISOString().split('T')[0],
       contract_days: contractDays,
       full_time_days: FULL_TIME_DAYS,
       base_entitlement_hours: BASE_ENTITLEMENT_HOURS,
@@ -238,7 +233,6 @@ function LeaveTracker() {
     return null
   }
 
-  // Update hours used on a period
   const updatePeriodHours = async (periodId, additionalHours) => {
     const period = protectedPeriods.find(p => p.id === periodId)
     if (!period) return
@@ -257,7 +251,6 @@ function LeaveTracker() {
     }
   }
 
-  // Reverse hours from a period (when deleting an entry)
   const reversePeriodHours = async (periodId, hoursToReverse) => {
     const period = protectedPeriods.find(p => p.id === periodId)
     if (!period) return
@@ -276,7 +269,6 @@ function LeaveTracker() {
     }
   }
 
-  // Convert entry amount to hours based on tracking unit
   const toHours = (amount, unit) => {
     const num = parseFloat(amount)
     if (unit === 'hours') return num
@@ -293,11 +285,7 @@ function LeaveTracker() {
 
     const newBalances = leaveTypes.map(lt => {
       const policy = leavePolicies.find(p => p.leave_type_id === lt.id)
-      const typeName = lt.name?.toLowerCase() || ''
-      const isProtected = isProtectedLeaveType(typeName)
-
-      // Protected leave types: don't allocate in balances (tracked via periods)
-      // School-provided: use policy allocation
+      const isProtected = isProtectedLeaveType(lt.name)
       return {
         tenant_id: profile.tenant_id,
         staff_id: staffId,
@@ -334,13 +322,11 @@ function LeaveTracker() {
     const isProtected = leaveType ? isProtectedLeaveType(leaveType.name) : false
     const hoursAmount = toHours(newEntry.amount, newEntry.tracking_unit)
 
-    // For protected leave: check/create rolling period
     let periodId = null
     if (isProtected) {
       let activePeriod = getActivePeriod(newEntry.staff_id, newEntry.leave_type_id)
 
       if (!activePeriod) {
-        // No active period — create one starting from this entry's start date
         activePeriod = await createProtectedPeriod(
           newEntry.staff_id,
           newEntry.leave_type_id,
@@ -353,14 +339,13 @@ function LeaveTracker() {
         }
       }
 
-      // Check if hours would exceed entitlement
       const remaining = parseFloat(activePeriod.prorated_entitlement_hours) - parseFloat(activePeriod.hours_used)
       if (hoursAmount > remaining) {
         const proceed = confirm(
           `This entry (${hoursAmount.toFixed(2)} hrs) would exceed the remaining entitlement ` +
           `(${remaining.toFixed(2)} hrs of ${parseFloat(activePeriod.prorated_entitlement_hours).toFixed(2)} hrs).\n\n` +
-          `Period: ${new Date(activePeriod.period_start_date).toLocaleDateString()} – ` +
-          `${new Date(activePeriod.period_end_date).toLocaleDateString()}\n\n` +
+          `Period: ${new Date(activePeriod.period_start).toLocaleDateString()} – ` +
+          `${new Date(activePeriod.period_end).toLocaleDateString()}\n\n` +
           `Continue anyway?`
         )
         if (!proceed) {
@@ -372,7 +357,6 @@ function LeaveTracker() {
       periodId = activePeriod.id
     }
 
-    // Save the entry — always store amount in the selected tracking unit
     const entryData = {
       tenant_id: profile.tenant_id,
       staff_id: newEntry.staff_id,
@@ -399,18 +383,15 @@ function LeaveTracker() {
       return
     }
 
-    // Update protected leave period hours
     if (isProtected && periodId) {
       await updatePeriodHours(periodId, hoursAmount)
     }
 
-    // Update school-provided balance (non-protected leave types)
     if (!isProtected) {
       const existingBalance = leaveBalances.find(
         b => b.staff_id === newEntry.staff_id && b.leave_type_id === newEntry.leave_type_id && b.school_year === schoolYear
       )
       if (existingBalance) {
-        // Convert to the balance's tracking unit for storage
         const balanceUnit = existingBalance.tracking_unit || 'days'
         let amountInBalanceUnit = parseFloat(newEntry.amount)
         if (newEntry.tracking_unit === 'hours' && balanceUnit === 'days') {
@@ -432,8 +413,6 @@ function LeaveTracker() {
       }
     }
 
-    // Also handle concurrent leave — if logging FMLA concurrent with PLO,
-    // we need to also deduct from the concurrent leave's period
     if (newEntry.concurrent_leave_type_id) {
       const concurrentType = leaveTypes.find(t => t.id === newEntry.concurrent_leave_type_id)
       if (concurrentType && isProtectedLeaveType(concurrentType.name)) {
@@ -483,21 +462,18 @@ function LeaveTracker() {
 
     if (error) return
 
-    // Reverse protected leave period hours
     if (isProtected) {
-      // Find the period that was active when this entry was made
       const relevantPeriod = protectedPeriods.find(p =>
         p.staff_id === entry.staff_id &&
         p.leave_type_id === entry.leave_type_id &&
-        new Date(entry.start_date) >= new Date(p.period_start_date) &&
-        new Date(entry.start_date) <= new Date(p.period_end_date)
+        new Date(entry.start_date) >= new Date(p.period_start) &&
+        new Date(entry.start_date) <= new Date(p.period_end)
       )
       if (relevantPeriod) {
         await reversePeriodHours(relevantPeriod.id, hoursAmount)
       }
     }
 
-    // Reverse school-provided balance
     if (!isProtected) {
       const existingBalance = leaveBalances.find(
         b => b.staff_id === entry.staff_id && b.leave_type_id === entry.leave_type_id && b.school_year === schoolYear
@@ -524,15 +500,14 @@ function LeaveTracker() {
       }
     }
 
-    // Reverse concurrent leave period if applicable
     if (entry.concurrent_leave_type_id) {
       const concurrentType = leaveTypes.find(t => t.id === entry.concurrent_leave_type_id)
       if (concurrentType && isProtectedLeaveType(concurrentType.name)) {
         const concurrentPeriod = protectedPeriods.find(p =>
           p.staff_id === entry.staff_id &&
           p.leave_type_id === entry.concurrent_leave_type_id &&
-          new Date(entry.start_date) >= new Date(p.period_start_date) &&
-          new Date(entry.start_date) <= new Date(p.period_end_date)
+          new Date(entry.start_date) >= new Date(p.period_start) &&
+          new Date(entry.start_date) <= new Date(p.period_end)
         )
         if (concurrentPeriod) {
           await reversePeriodHours(concurrentPeriod.id, hoursAmount)
@@ -654,7 +629,6 @@ function LeaveTracker() {
     return results
   }
 
-  // Get eligibility alerts for a specific staff member
   const getStaffEligibilityAlerts = (staffMember) => {
     if (!staffMember.hire_date) return []
     const tenure = calculateTenure(staffMember.hire_date)
@@ -672,7 +646,6 @@ function LeaveTracker() {
     return alerts
   }
 
-  // Compute protected leave summary for a staff card
   const getProtectedLeaveSummary = (staffId) => {
     return leaveTypes
       .filter(lt => isProtectedLeaveType(lt.name))
@@ -698,7 +671,6 @@ function LeaveTracker() {
   const staffWithLeave = [...new Set(leaveEntries.map(e => e.staff_id))].length
   const totalEntriesThisYear = leaveEntries.length
   const staffApproachingLimits = staff.filter(s => {
-    // Check school-provided balances
     const balances = getStaffBalances(s.id)
     const schoolLimitHit = balances.some(b => {
       if (isProtectedLeaveType(b.type.name)) return false
@@ -706,7 +678,6 @@ function LeaveTracker() {
       const used = parseFloat(b.balance.used)
       return allocated > 0 && (used / allocated) >= 0.75
     })
-    // Check protected leave periods
     const protectedLimitHit = protectedPeriods.some(p => {
       if (p.staff_id !== s.id || p.status !== 'active') return false
       const pct = parseFloat(p.hours_used) / parseFloat(p.prorated_entitlement_hours)
@@ -813,7 +784,6 @@ function LeaveTracker() {
 
                 return (
                   <div key={s.id} className="bg-white rounded-lg shadow p-4">
-                    {/* Staff Header */}
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <h3 className="font-semibold text-[#2c3e7e]">{s.full_name}</h3>
@@ -849,14 +819,13 @@ function LeaveTracker() {
                       </div>
                     </div>
 
-                    {/* School-Provided Balances (days) */}
+                    {/* School-Provided Balances */}
                     <div className="space-y-2">
                       {schoolProvided.map(b => {
                         const allocated = parseFloat(b.balance.allocated) + parseFloat(b.balance.carried_over || 0)
                         const used = parseFloat(b.balance.used)
                         const remaining = Math.max(0, allocated - used)
                         const percent = getUsagePercent(used, allocated)
-
                         return (
                           <div key={b.type.id}>
                             <div className="flex justify-between text-xs mb-1">
@@ -876,7 +845,7 @@ function LeaveTracker() {
                       })}
                     </div>
 
-                    {/* Protected Leave (FMLA/OFLA/PLO) — Hours-based */}
+                    {/* Protected Leave (FMLA/OFLA/PLO) */}
                     {protectedSummary.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-gray-100">
                         <p className="text-xs text-[#666666] font-medium mb-2">Protected Leave (Hours)</p>
@@ -885,7 +854,6 @@ function LeaveTracker() {
                             const period = ps.period
                             const entitlement = ps.entitlement
                             if (!period && !entitlement) {
-                              // No contract data and no period
                               return (
                                 <div key={ps.type.id} className="flex items-center gap-2">
                                   <span className={`text-xs px-2 py-0.5 rounded-full ${getCategoryColor(ps.type.category)}`}>
@@ -895,16 +863,13 @@ function LeaveTracker() {
                                 </div>
                               )
                             }
-
                             if (period) {
-                              // Has an active/exhausted period
                               const totalHrs = parseFloat(period.prorated_entitlement_hours)
                               const usedHrs = parseFloat(period.hours_used)
                               const remainHrs = Math.max(0, totalHrs - usedHrs)
                               const pct = getUsagePercent(usedHrs, totalHrs)
-                              const periodStart = new Date(period.period_start_date).toLocaleDateString()
-                              const periodEnd = new Date(period.period_end_date).toLocaleDateString()
-
+                              const periodStart = new Date(period.period_start).toLocaleDateString()
+                              const periodEnd = new Date(period.period_end).toLocaleDateString()
                               return (
                                 <div key={ps.type.id}>
                                   <div className="flex justify-between text-xs mb-1">
@@ -930,8 +895,6 @@ function LeaveTracker() {
                                 </div>
                               )
                             }
-
-                            // No period yet — show entitlement available
                             return (
                               <div key={ps.type.id} className="flex justify-between items-center">
                                 <span className={`text-xs px-2 py-0.5 rounded-full ${getCategoryColor(ps.type.category)}`}>
@@ -1051,7 +1014,6 @@ function LeaveTracker() {
                     ))}
                 </tbody>
               </table>
-
               {leaveEntries.length === 0 && (
                 <div className="text-center py-12 text-[#666666]">
                   No leave entries recorded yet. Click "Log Leave Entry" to add one.
@@ -1064,7 +1026,6 @@ function LeaveTracker() {
         {/* ═══ Tab: Compliance Notes ═══ */}
         {activeTab === 'compliance' && (
           <div className="space-y-4">
-            {/* Protected Leave Proration Reference */}
             <div className="bg-white rounded-lg shadow p-4">
               <h3 className="font-semibold text-[#2c3e7e] mb-2">Protected Leave Proration Reference</h3>
               <p className="text-sm text-[#666666] mb-3">
@@ -1085,7 +1046,6 @@ function LeaveTracker() {
               </div>
             </div>
 
-            {/* Rolling Period Explanation */}
             <div className="bg-white rounded-lg shadow p-4">
               <h3 className="font-semibold text-[#2c3e7e] mb-2">Rolling 12-Month Leave Periods</h3>
               <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3">
@@ -1106,11 +1066,9 @@ function LeaveTracker() {
               </div>
             </div>
 
-            {/* Leave type compliance cards */}
             {leaveTypes.map(lt => {
               const policy = leavePolicies.find(p => p.leave_type_id === lt.id)
               if (!policy && !lt.description) return null
-
               return (
                 <div key={lt.id} className="bg-white rounded-lg shadow p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -1175,7 +1133,6 @@ function LeaveTracker() {
               </div>
 
               <div className="space-y-4">
-                {/* Staff Member */}
                 <div>
                   <label className="block text-sm font-medium text-[#666666] mb-1">Staff Member *</label>
                   <select
@@ -1195,7 +1152,6 @@ function LeaveTracker() {
                   </select>
                 </div>
 
-                {/* Leave Type */}
                 <div>
                   <label className="block text-sm font-medium text-[#666666] mb-1">Leave Type *</label>
                   <select
@@ -1237,12 +1193,9 @@ function LeaveTracker() {
                   const activePeriod = getActivePeriod(newEntry.staff_id, newEntry.leave_type_id)
                   const entitlement = getProratedEntitlement(newEntry.staff_id)
                   const contractDays = getContractDays(newEntry.staff_id)
-
                   return (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-xs font-medium text-blue-800 mb-1">
-                        {lt.name} — Protected Leave
-                      </p>
+                      <p className="text-xs font-medium text-blue-800 mb-1">{lt.name} — Protected Leave</p>
                       {!contractDays && (
                         <p className="text-xs text-orange-700">
                           ⚠ No contract length on file — using full-time (260 days / 480 hrs). Update ODE Staff Position data for accurate proration.
@@ -1255,7 +1208,7 @@ function LeaveTracker() {
                       )}
                       {activePeriod ? (
                         <p className="text-xs text-blue-700 mt-1">
-                          Active period: {new Date(activePeriod.period_start_date).toLocaleDateString()} – {new Date(activePeriod.period_end_date).toLocaleDateString()}
+                          Active period: {new Date(activePeriod.period_start).toLocaleDateString()} – {new Date(activePeriod.period_end).toLocaleDateString()}
                           {' • '}{(parseFloat(activePeriod.prorated_entitlement_hours) - parseFloat(activePeriod.hours_used)).toFixed(1)} hrs remaining
                         </p>
                       ) : (
@@ -1267,7 +1220,6 @@ function LeaveTracker() {
                   )
                 })()}
 
-                {/* Date Range */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-[#666666] mb-1">Start Date *</label>
@@ -1289,7 +1241,6 @@ function LeaveTracker() {
                   </div>
                 </div>
 
-                {/* Amount + Unit */}
                 <div>
                   <label className="block text-sm font-medium text-[#666666] mb-1">Amount *</label>
                   <div className="flex gap-2">
@@ -1312,7 +1263,6 @@ function LeaveTracker() {
                       <option value="weeks">Weeks</option>
                     </select>
                   </div>
-                  {/* Live conversion display */}
                   {newEntry.amount && (
                     <p className="text-xs text-gray-400 mt-1">
                       {newEntry.tracking_unit === 'hours' && `= ${(parseFloat(newEntry.amount) / HOURS_PER_DAY).toFixed(2)} days = ${(parseFloat(newEntry.amount) / HOURS_PER_WEEK).toFixed(2)} weeks`}
@@ -1322,7 +1272,6 @@ function LeaveTracker() {
                   )}
                 </div>
 
-                {/* Concurrent Leave */}
                 <div>
                   <label className="block text-sm font-medium text-[#666666] mb-1">Running Concurrently With (optional)</label>
                   <select
@@ -1336,13 +1285,10 @@ function LeaveTracker() {
                     ))}
                   </select>
                   {newEntry.concurrent_leave_type_id && (
-                    <p className="text-xs text-yellow-700 mt-1">
-                      ⚠ Hours will be deducted from both leave types' periods.
-                    </p>
+                    <p className="text-xs text-yellow-700 mt-1">⚠ Hours will be deducted from both leave types' periods.</p>
                   )}
                 </div>
 
-                {/* Reason */}
                 <div>
                   <label className="block text-sm font-medium text-[#666666] mb-1">Notes / Reason (optional)</label>
                   <textarea
@@ -1354,7 +1300,6 @@ function LeaveTracker() {
                   />
                 </div>
 
-                {/* Documentation */}
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -1409,7 +1354,6 @@ function LeaveTracker() {
                 <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
               </div>
 
-              {/* School-Provided Leave Balances */}
               <h4 className="font-semibold text-[#2c3e7e] mb-3">School-Provided Leave</h4>
               <div className="space-y-3 mb-6">
                 {getStaffBalances(selectedStaff.id)
@@ -1419,7 +1363,6 @@ function LeaveTracker() {
                     const used = parseFloat(b.balance.used)
                     const remaining = Math.max(0, allocated - used)
                     const percent = getUsagePercent(used, allocated)
-
                     return (
                       <div key={b.type.id} className="bg-gray-50 rounded-lg p-3">
                         <div className="flex justify-between items-center mb-1">
@@ -1429,9 +1372,7 @@ function LeaveTracker() {
                               {b.type.category === 'school_provided' ? 'School' : b.type.category === 'state' ? 'State' : 'Federal'}
                             </span>
                           </div>
-                          <span className="text-sm font-medium text-[#2c3e7e]">
-                            {used} / {allocated} days used
-                          </span>
+                          <span className="text-sm font-medium text-[#2c3e7e]">{used} / {allocated} days used</span>
                         </div>
                         {allocated > 0 && (
                           <div className="w-full bg-gray-200 rounded-full h-2.5 mt-1">
@@ -1452,14 +1393,12 @@ function LeaveTracker() {
                   })}
               </div>
 
-              {/* Protected Leave Periods */}
               <h4 className="font-semibold text-[#2c3e7e] mb-3">Protected Leave (Rolling 12-Month Periods)</h4>
               <div className="space-y-3 mb-6">
                 {leaveTypes.filter(lt => isProtectedLeaveType(lt.name)).map(lt => {
                   const period = getLatestPeriod(selectedStaff.id, lt.id)
                   const entitlement = getProratedEntitlement(selectedStaff.id)
                   const contractDays = getContractDays(selectedStaff.id)
-
                   return (
                     <div key={lt.id} className="bg-gray-50 rounded-lg p-3">
                       <div className="flex justify-between items-center mb-1">
@@ -1479,7 +1418,6 @@ function LeaveTracker() {
                           </span>
                         )}
                       </div>
-
                       {period && (
                         <>
                           <div className="w-full bg-gray-200 rounded-full h-2.5 mt-1">
@@ -1495,7 +1433,7 @@ function LeaveTracker() {
                               {Math.max(0, parseFloat(period.prorated_entitlement_hours) - parseFloat(period.hours_used)).toFixed(1)} hrs remaining
                             </span>
                             <span>
-                              Period: {new Date(period.period_start_date).toLocaleDateString()} – {new Date(period.period_end_date).toLocaleDateString()}
+                              Period: {new Date(period.period_start).toLocaleDateString()} – {new Date(period.period_end).toLocaleDateString()}
                               {period.status === 'exhausted' && (
                                 <span className="text-red-500 font-medium ml-1">• Exhausted</span>
                               )}
@@ -1503,7 +1441,6 @@ function LeaveTracker() {
                           </div>
                         </>
                       )}
-
                       {!period && (
                         <p className="text-xs text-gray-400 mt-1">
                           No leave used yet — period starts when first entry is logged.
@@ -1515,7 +1452,6 @@ function LeaveTracker() {
                 })}
               </div>
 
-              {/* Leave History */}
               <h4 className="font-semibold text-[#2c3e7e] mb-3">Leave History</h4>
               {getStaffEntries(selectedStaff.id).length === 0 ? (
                 <p className="text-sm text-[#666666]">No leave entries recorded.</p>
