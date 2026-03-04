@@ -63,7 +63,7 @@ export default function Navbar() {
           <a href="/dashboard" className="text-xl font-bold text-white">StaffTrak</a>
           <div className="hidden md:flex gap-4">
             {getNavItems().map(item => (
-              
+              <a
                 key={item.href}
                 href={item.href}
                 className="text-white hover:text-gray-200"
