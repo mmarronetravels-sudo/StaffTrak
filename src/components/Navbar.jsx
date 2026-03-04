@@ -56,14 +56,14 @@ export default function Navbar() {
     ]
   }
 
- return (
+  return (
     <nav className="bg-[#2c3e7e] shadow">
       <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-8">
           <a href="/dashboard" className="text-xl font-bold text-white">StaffTrak</a>
           <div className="hidden md:flex gap-4">
             {getNavItems().map(item => (
-              
+              <a
                 key={item.href}
                 href={item.href}
                 className="text-white hover:text-gray-200"
@@ -74,7 +74,7 @@ export default function Navbar() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          
+          <a
             href="https://timetrak.scholarpathsystems.org"
             onClick={handleSwitchToTimeTrak}
             className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[#2c3e7e] bg-[#f3843e] hover:bg-[#e07030] transition-colors"
@@ -104,6 +104,7 @@ export default function Navbar() {
           </button>
         </div>
       </div>
+
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-[#1e2a5e] border-t border-[#477fc1]">
@@ -111,7 +112,7 @@ export default function Navbar() {
             {profile?.full_name || user?.email}
           </div>
           {getNavItems().map(item => (
-            
+            <a
               key={item.href}
               href={item.href}
               className="block px-4 py-3 text-white hover:bg-[#477fc1] border-b border-[#477fc1]/30"
@@ -119,7 +120,7 @@ export default function Navbar() {
               {item.label}
             </a>
           ))}
-          
+          <a
             href="https://timetrak.scholarpathsystems.org"
             onClick={handleSwitchToTimeTrak}
             className="block px-4 py-3 text-[#f3843e] hover:bg-[#477fc1] border-b border-[#477fc1]/30 font-semibold"
