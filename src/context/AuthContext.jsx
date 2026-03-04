@@ -1,86 +1,99 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../supabaseClient'
+import { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
 
-const AuthContext = createContext({})
+const AuthContext = createContext({});
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
+    // Check for token handoff from product switcher
+    const params = new URLSearchParams(window.location.search);
+    const accessToken = params.get('token');
+    const refreshToken = params.get('refresh');
+
+    if (accessToken && refreshToken) {
+      // Clean the tokens from the URL immediately
+      window.history.replaceState({}, '', window.location.pathname);
+      // Set the session using the passed tokens
+      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ data: { session }, error }) => {
+          if (session?.user) {
+            setUser(session.user);
+            fetchProfile(session.user.id);
+          } else {
+            console.error('Token handoff failed:', error);
+            setLoading(false);
+          }
+        });
+      return; // Skip normal getSession flow
+    }
+
+    // Normal session init
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session:', session)
-      setUser(session?.user ?? null)
+      setUser(session?.user ?? null);
+      if (session?.user) fetchProfile(session.user.id);
+      else setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id)
+        await fetchProfile(session.user.id);
       } else {
-        setLoading(false)
+        setProfile(null);
+        setLoading(false);
       }
-    })
+    });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('Auth state changed:', _event, session)
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchProfile(session.user.id)
-      } else {
-        setProfile(null)
-        setLoading(false)
-      }
-    })
+    return () => subscription.unsubscribe();
+  }, []);
 
-    return () => subscription.unsubscribe()
-  }, [])
-
-  async function fetchProfile(userId) {
-    try {
-      const { data, error } = await supabase
+  const fetchProfile = async (userId, retries = 3) => {
+    for (let i = 0; i < retries; i++) {
+      const { data } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
-
-      if (error) {
-        console.error('Error fetching profile:', error)
-      } else {
-        setProfile(data)
+        .single();
+      if (data) {
+        setProfile(data);
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error fetching profile:', error)
-    } finally {
-      setLoading(false)
+      if (i < retries - 1) await new Promise(r => setTimeout(r, 500));
     }
-  }
+    setLoading(false);
+  };
 
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
+  const signIn = async (email, password) => {
+    return supabase.auth.signInWithPassword({ email, password });
+  };
 
-  const value = {
-    user,
-    profile,
-    loading,
-    signOut,
-    // Admin = district_admin or school_admin
-    isAdmin: profile?.role === 'district_admin' || profile?.role === 'school_admin',
-    // Evaluator = anyone with is_evaluator flag OR district/school admin
-    isEvaluator: profile?.is_evaluator === true || profile?.role === 'district_admin' || profile?.role === 'school_admin',
-    // Staff = licensed or classified (note: evaluators may also be staff)
-    isStaff: profile?.role === 'licensed_staff' || profile?.role === 'classified_staff',
-    // HR role
-    isHR: profile?.role === 'hr',
-  }
+  const signOut = async () => {
+    setUser(null);
+    setProfile(null);
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  };
+
+  const isAdmin = profile?.role === 'district_admin' || profile?.role === 'school_admin';
+  const isEvaluator = profile?.is_evaluator === true || isAdmin;
+  const isHR = profile?.role === 'hr';
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user, profile, loading,
+      signIn, signOut,
+      isAdmin, isEvaluator, isHR
+    }}>
       {children}
     </AuthContext.Provider>
-  )
+  );
 }
 
 export function useAuth() {
-  return useContext(AuthContext)
+  return useContext(AuthContext);
 }
