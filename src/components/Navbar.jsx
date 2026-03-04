@@ -1,14 +1,29 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../supabaseClient'
+
 export default function Navbar() {
   const { user, profile, signOut, isAdmin, isEvaluator } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
   const handleLogout = async () => {
     await signOut()
     window.location.href = '/login'
   }
+
   const isHR = profile?.role === 'hr'
-  // Navigation items based on role
+
+  const handleSwitchToTimeTrak = async (e) => {
+    e.preventDefault()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      const url = `https://timetrak.scholarpathsystems.org/dashboard?token=${session.access_token}&refresh=${session.refresh_token}`
+      window.location.href = url
+    } else {
+      window.location.href = 'https://timetrak.scholarpathsystems.org'
+    }
+  }
+
   const getNavItems = () => {
     if (isHR) {
       return [
@@ -40,17 +55,17 @@ export default function Navbar() {
       { href: '/my-summative', label: 'My Evaluation' }
     ]
   }
+
   return (
     <nav className="bg-[#2c3e7e] shadow">
       <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
         <div className="flex items-center gap-8">
           <a href="/dashboard" className="text-xl font-bold text-white">StaffTrak</a>
-          {/* Desktop Nav - hidden on mobile */}
           <div className="hidden md:flex gap-4">
             {getNavItems().map(item => (
-              <a 
+              
                 key={item.href}
-                href={item.href} 
+                href={item.href}
                 className="text-white hover:text-gray-200"
               >
                 {item.label}
@@ -60,24 +75,22 @@ export default function Navbar() {
         </div>
         <div className="flex items-center gap-3">
           {/* Product Switcher */}
-          <a
+          
             href="https://timetrak.scholarpathsystems.org"
+            onClick={handleSwitchToTimeTrak}
             className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[#2c3e7e] bg-[#f3843e] hover:bg-[#e07030] transition-colors"
             title="Switch to TimeTrak"
           >
             <span>TimeTrak</span>
             <span>→</span>
           </a>
-          {/* Username - hidden on mobile */}
           <span className="hidden md:block text-white">{profile?.full_name || user?.email}</span>
-          {/* Logout - hidden on mobile */}
           <button
             onClick={handleLogout}
             className="hidden md:block bg-white text-[#2c3e7e] px-4 py-2 rounded-lg hover:bg-gray-100"
           >
             Logout
           </button>
-          {/* Hamburger Menu - shown only on mobile */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden text-white p-2"
@@ -92,7 +105,7 @@ export default function Navbar() {
           </button>
         </div>
       </div>
-      
+
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-[#1e2a5e] border-t border-[#477fc1]">
@@ -100,16 +113,17 @@ export default function Navbar() {
             {profile?.full_name || user?.email}
           </div>
           {getNavItems().map(item => (
-            <a 
+            
               key={item.href}
-              href={item.href} 
+              href={item.href}
               className="block px-4 py-3 text-white hover:bg-[#477fc1] border-b border-[#477fc1]/30"
             >
               {item.label}
             </a>
           ))}
-          <a
+          
             href="https://timetrak.scholarpathsystems.org"
+            onClick={handleSwitchToTimeTrak}
             className="block px-4 py-3 text-[#f3843e] hover:bg-[#477fc1] border-b border-[#477fc1]/30 font-semibold"
           >
             Switch to TimeTrak →
