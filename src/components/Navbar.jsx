@@ -63,7 +63,7 @@ export default function Navbar() {
           <a href="/dashboard" className="text-xl font-bold text-white">StaffTrak</a>
           <div className="hidden md:flex gap-4">
             {getNavItems().map(item => (
-              <a
+              
                 key={item.href}
                 href={item.href}
                 className="text-white hover:text-gray-200"
@@ -74,7 +74,6 @@ export default function Navbar() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* Product Switcher */}
           
             href="https://timetrak.scholarpathsystems.org"
             onClick={handleSwitchToTimeTrak}
@@ -105,8 +104,7 @@ export default function Navbar() {
           </button>
         </div>
       </div>
-
-{/* Mobile Menu Dropdown */}
+      {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-[#1e2a5e] border-t border-[#477fc1]">
           <div className="px-4 py-2 text-white text-sm border-b border-[#477fc1]">
