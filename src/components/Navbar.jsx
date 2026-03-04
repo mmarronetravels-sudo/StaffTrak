@@ -106,7 +106,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown */}
+{/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-[#1e2a5e] border-t border-[#477fc1]">
           <div className="px-4 py-2 text-white text-sm border-b border-[#477fc1]">
