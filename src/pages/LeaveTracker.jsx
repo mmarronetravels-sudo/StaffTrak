@@ -9,7 +9,7 @@ const PROTECTED_LEAVE_KEYWORDS = ['fmla', 'ofla', 'plo', 'paid leave oregon']
 
 const isProtectedLeaveType = (leaveTypeName) => {
   const name = (leaveTypeName || '').toLowerCase()
-  return PROTECTED_LEAVE_KEYWORDS.some(kw => name.includes(kw))
+  return PROTECTED_LEAVE_KEYWORDS.some(kw => name.includes(kw)) 
 }
 
 // Proration constants
