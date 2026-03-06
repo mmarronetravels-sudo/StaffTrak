@@ -791,7 +791,7 @@ function LeaveTracker() {
                 {getStaffBalances(selectedStaff.id).map(b => {
                   const allocated = parseFloat(b.balance.allocated) + parseFloat(b.balance.carried_over || 0)
                   const used      = parseFloat(b.balance.used)
-                  const remaining = Math.max(0, allocated - used)
+                  const remaining = Math.round((Math.max(0, allocated - used)) * 10) / 10
                   const percent   = getUsagePercent(used, allocated)
                   const isWeeks   = b.policy?.tracking_unit === 'weeks'
                   return (
