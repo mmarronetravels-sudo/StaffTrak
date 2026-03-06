@@ -273,8 +273,8 @@ function LeaveTracker() {
         delete next[key]
         return next
       }
-      // default amount = same as newEntry.amount if set, else 1
-      return { ...prev, [key]: newEntry.amount || 1 }
+      // Pick Days mode always uses hours, default 8
+      return { ...prev, [key]: 8 }
     })
   }
 
@@ -323,7 +323,7 @@ function LeaveTracker() {
       start_date: key,
       end_date: key,
       amount: parseFloat(pickedDays[key]),
-      tracking_unit: newEntry.tracking_unit,
+      tracking_unit: 'hours',
       concurrent_leave_type_id: newEntry.concurrent_leave_type_id || null,
       reason: newEntry.reason || null,
       documentation_on_file: newEntry.documentation_on_file,
@@ -939,7 +939,7 @@ function LeaveTracker() {
                     {Object.keys(pickedDays).length > 0 && (
                       <div className="mt-4 space-y-2">
                         <p className="text-xs font-medium text-[#666666] uppercase tracking-wide">
-                          Amount per day ({newEntry.tracking_unit || 'days'})
+                          Hours per day
                         </p>
                         {Object.keys(pickedDays).sort().map(key => {
                           const d = new Date(key + 'T00:00:00')
@@ -955,6 +955,7 @@ function LeaveTracker() {
                                 onChange={(e) => updatePickedDayAmount(key, e.target.value)}
                                 className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
                               />
+                              <span className="text-xs text-[#666666]">hrs</span>
                               <button
                                 onClick={() => togglePickedDay(new Date(key + 'T00:00:00'))}
                                 className="text-gray-400 hover:text-red-500 text-xs"
@@ -964,8 +965,9 @@ function LeaveTracker() {
                         })}
                         <p className="text-xs text-[#666666] pt-1">
                           Total: <span className="font-semibold text-[#2c3e7e]">
-                            {Object.values(pickedDays).reduce((s, v) => s + parseFloat(v || 0), 0)} {newEntry.tracking_unit || 'days'}
+                            {Object.values(pickedDays).reduce((s, v) => s + parseFloat(v || 0), 0)} hrs
                           </span> across {Object.keys(pickedDays).length} {Object.keys(pickedDays).length === 1 ? 'day' : 'days'}
+                        </p>
                         </p>
                       </div>
                     )}
