@@ -273,8 +273,8 @@ function LeaveTracker() {
         delete next[key]
         return next
       }
-      // Pick Days mode always uses hours, default 8
-      return { ...prev, [key]: 8 }
+      // default amount = same as newEntry.amount if set, else 1
+      return { ...prev, [key]: newEntry.amount || 1 }
     })
   }
 
@@ -323,7 +323,7 @@ function LeaveTracker() {
       start_date: key,
       end_date: key,
       amount: parseFloat(pickedDays[key]),
-      tracking_unit: 'hours',
+      tracking_unit: newEntry.tracking_unit,
       concurrent_leave_type_id: newEntry.concurrent_leave_type_id || null,
       reason: newEntry.reason || null,
       documentation_on_file: newEntry.documentation_on_file,
@@ -653,7 +653,7 @@ function LeaveTracker() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-[#666666]">
-                          {new Date(entry.start_date).toLocaleDateString()} â€“ {new Date(entry.end_date).toLocaleDateString()}
+                          {new Date(entry.start_date).toLocaleDateString()} — {new Date(entry.end_date).toLocaleDateString()}
                         </td>
                         <td className="px-4 py-3 text-sm text-[#666666]">
                           {entry.amount} {entry.tracking_unit}
@@ -663,13 +663,13 @@ function LeaveTracker() {
                             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
                               + {getTypeName(entry.concurrent_leave_type_id)}
                             </span>
-                          ) : 'â€”'}
+                          ) : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {entry.documentation_on_file ? (
-                            <span className="text-green-600">âœ“</span>
+                            <span className="text-green-600">✓</span>
                           ) : (
-                            <span className="text-gray-300">â€”</span>
+                            <span className="text-gray-300">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -968,7 +968,6 @@ function LeaveTracker() {
                             {Object.values(pickedDays).reduce((s, v) => s + parseFloat(v || 0), 0)} hrs
                           </span> across {Object.keys(pickedDays).length} {Object.keys(pickedDays).length === 1 ? 'day' : 'days'}
                         </p>
-                        </p>
                       </div>
                     )}
 
@@ -1046,7 +1045,7 @@ function LeaveTracker() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h3 className="text-lg font-bold text-[#2c3e7e]">{selectedStaff.full_name}</h3>
-                  <p className="text-sm text-[#666666]">{selectedStaff.position_type || selectedStaff.role} â€” {schoolYear}</p>
+                  <p className="text-sm text-[#666666]">{selectedStaff.position_type || selectedStaff.role} — {schoolYear}</p>
                 </div>
                 <button onClick={() => setShowDetailModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
               </div>
@@ -1107,7 +1106,7 @@ function LeaveTracker() {
                             {getTypeName(entry.leave_type_id)}
                           </span>
                           <span className="text-sm text-[#666666]">
-                            {new Date(entry.start_date).toLocaleDateString()} â€“ {new Date(entry.end_date).toLocaleDateString()}
+                            {new Date(entry.start_date).toLocaleDateString()} — {new Date(entry.end_date).toLocaleDateString()}
                           </span>
                         </div>
                         <p className="text-sm text-[#2c3e7e] font-medium mt-1">
@@ -1121,7 +1120,7 @@ function LeaveTracker() {
                         {entry.reason && <p className="text-xs text-[#666666] mt-1">{entry.reason}</p>}
                       </div>
                       <div className="flex items-center gap-2">
-                        {entry.documentation_on_file && <span className="text-green-600 text-xs">Docs âœ“</span>}
+                        {entry.documentation_on_file && <span className="text-green-600 text-xs">Docs ✓</span>}
                         <button
                           onClick={() => handleCopyEntry(entry)}
                           className="text-[#477fc1] hover:text-[#2c3e7e] text-xs font-medium"
