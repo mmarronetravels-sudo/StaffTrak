@@ -50,6 +50,7 @@ function LeaveTracker() {
       .select('*')
       .eq('tenant_id', profile.tenant_id)
       .in('role', ['licensed_staff', 'classified_staff'])
+      .eq('is_active', true)
       .order('full_name')
 
     // Fetch leave types
