@@ -1078,7 +1078,7 @@ function LeaveTracker() {
                           {used} / {entitlement} {unit} used
                         </span>
                       </div>
-                      {allocated > 0 && (
+                      {entitlement > 0 && (
                         <div className="w-full bg-gray-200 rounded-full h-2.5 mt-1">
                           <div
                             className={`h-2.5 rounded-full transition-all ${getBarColor(percent)}`}
