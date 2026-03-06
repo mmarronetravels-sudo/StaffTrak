@@ -573,7 +573,7 @@ function LeaveTracker() {
                         <div className="flex flex-wrap gap-2">
                           {stateFederal.filter(b => parseFloat(b.balance.used) > 0).map(b => (
                             <span key={b.type.id} className={`text-xs px-2 py-0.5 rounded-full ${getCategoryColor(b.type.category)}`}>
-                              {b.type.name}: {b.balance.used} {b.policy?.tracking_unit || 'weeks'}
+                              {b.type.name}: {b.balance.used} hrs
                             </span>
                           ))}
                         </div>
@@ -1054,11 +1054,16 @@ function LeaveTracker() {
               <h4 className="font-semibold text-[#2c3e7e] mb-3">Leave Balances</h4>
               <div className="space-y-3 mb-6">
                 {getStaffBalances(selectedStaff.id).map(b => {
-                  const allocated = parseFloat(b.balance.allocated) + parseFloat(b.balance.carried_over || 0)
-                  const used = parseFloat(b.balance.used)
-                  const remaining = Math.max(0, allocated - used)
-                  const percent = getUsagePercent(used, allocated)
-                  const isWeeks = b.policy?.tracking_unit === 'weeks'
+                  const isProtected = b.type.category !== 'school_provided'
+                  // Protected leave (FMLA/OFLA/PLO) always displayed in hours
+                  // School-provided leave displayed in days
+                  const entitlement = isProtected ? 480 : (parseFloat(b.balance.allocated) + parseFloat(b.balance.carried_over || 0))
+                  const used = isProtected
+                    ? parseFloat(b.balance.used) // hours as stored
+                    : parseFloat(b.balance.used)
+                  const remaining = Math.max(0, entitlement - used)
+                  const percent = getUsagePercent(used, entitlement)
+                  const unit = isProtected ? 'hrs' : 'days'
 
                   return (
                     <div key={b.type.id} className="bg-gray-50 rounded-lg p-3">
@@ -1070,7 +1075,7 @@ function LeaveTracker() {
                           </span>
                         </div>
                         <span className="text-sm font-medium text-[#2c3e7e]">
-                          {used} / {allocated} {isWeeks ? 'weeks' : 'days'} used
+                          {used} / {entitlement} {unit} used
                         </span>
                       </div>
                       {allocated > 0 && (
@@ -1082,7 +1087,7 @@ function LeaveTracker() {
                         </div>
                       )}
                       <div className="flex justify-between text-xs text-[#666666] mt-1">
-                        <span>{remaining} {isWeeks ? 'weeks' : 'days'} remaining</span>
+                        <span>{remaining} {unit} remaining</span>
                         {parseFloat(b.balance.carried_over) > 0 && (
                           <span>(includes {b.balance.carried_over} carried over)</span>
                         )}
