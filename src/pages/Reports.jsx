@@ -29,7 +29,7 @@ function Reports() {
     // Fetch all staff (for reports) — scoped to tenant
     const { data: staffData } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, full_name, email, position_type, staff_type, years_at_school, evaluator_id')
       .eq('tenant_id', profile.tenant_id)
       .in('role', ['licensed_staff', 'classified_staff'])
       .eq('is_active', true)

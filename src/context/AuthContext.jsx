@@ -70,7 +70,7 @@ export function AuthProvider({ children }) {
     for (let i = 0; i < retries; i++) {
       const { data } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, tenant_id, email, full_name, role, position_type, staff_type, is_evaluator, is_active, evaluator_id')
         .eq('id', userId)
         .single();
       if (data) {

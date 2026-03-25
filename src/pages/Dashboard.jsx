@@ -42,7 +42,7 @@ function Dashboard() {
   const fetchTenant = async () => {
     const { data, error } = await supabase
       .from('tenants')
-      .select('*')
+      .select('id, name')
       .eq('id', profile.tenant_id)
       .single()
 
@@ -57,37 +57,37 @@ function Dashboard() {
       // Goals
       supabase
         .from('goals')
-        .select('*')
+        .select('id, goal_type, title, status, created_at')
         .eq('staff_id', profile.id)
         .order('created_at', { ascending: false }),
-      
+
       // Observations
       supabase
         .from('observations')
-        .select('*, observer:observer_id(full_name)')
+        .select('id, observation_type, status, scheduled_at, observer:observer_id(full_name)')
         .eq('staff_id', profile.id)
         .order('scheduled_at', { ascending: true }),
-      
+
       // Meetings
       supabase
         .from('meetings')
-        .select('*')
+        .select('id, meeting_type, status, scheduled_at')
         .eq('staff_id', profile.id)
         .order('scheduled_at', { ascending: true }),
-      
+
       // Evaluation
       supabase
         .from('summative_evaluations')
-        .select('*')
+        .select('id, status, overall_rating, created_at')
         .eq('staff_id', profile.id)
         .order('created_at', { ascending: false })
         .limit(1)
         .single(),
-      
+
       // Self-reflection
       supabase
         .from('self_assessments')
-        .select('*')
+        .select('id, status, created_at')
         .eq('staff_id', profile.id)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -232,7 +232,7 @@ function Dashboard() {
 
       const { data: observations } = await supabase
         .from('observations')
-        .select('*')
+        .select('id, status')
         .eq('observer_id', profile.id)
         .in('status', ['scheduled', 'in_progress'])
 
@@ -241,7 +241,7 @@ function Dashboard() {
       const { data: pendingGoals } = assignedStaffIds.length > 0
         ? await supabase
             .from('goals')
-            .select('*')
+            .select('id')
             .in('staff_id', assignedStaffIds)
             .eq('status', 'submitted')
         : { data: [] }
@@ -250,7 +250,7 @@ function Dashboard() {
 
       const { data: upcomingObs } = await supabase
         .from('observations')
-        .select('*, profiles!observations_staff_id_fkey(full_name)')
+        .select('id, scheduled_at, observation_type, profiles!observations_staff_id_fkey(full_name)')
         .eq('observer_id', profile.id)
         .eq('status', 'scheduled')
         .order('scheduled_at', { ascending: true })
@@ -270,18 +270,18 @@ function Dashboard() {
       // Staff stats
       const { data: myGoals } = await supabase
         .from('goals')
-        .select('*')
+        .select('id, status')
         .eq('staff_id', profile.id)
 
       const { data: myObservations } = await supabase
         .from('observations')
-        .select('*')
+        .select('id, status')
         .eq('staff_id', profile.id)
         .in('status', ['scheduled', 'in_progress'])
 
       const { data: myEvaluation } = await supabase
         .from('summative_evaluations')
-        .select('*')
+        .select('id, status')
         .eq('staff_id', profile.id)
         .eq('status', 'pending_staff_signature')
         .single()

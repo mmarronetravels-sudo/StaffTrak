@@ -22,7 +22,7 @@ function Summatives() {
     // Fetch staff assigned to this evaluator
     const { data: staffData } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, full_name, position_type, staff_type')
       .eq('evaluator_id', profile.id)
       .eq('is_active', true)
       .order('full_name')

@@ -41,7 +41,7 @@ function SummativeEvaluation() {
     // Fetch staff member — verify they belong to the same tenant
     const { data: staffData } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, full_name, email, position_type, staff_type, assigned_rubric_id, evaluator_id, years_at_school, tenant_id')
       .eq('id', staffId)
       .eq('tenant_id', profile.tenant_id)
       .single()

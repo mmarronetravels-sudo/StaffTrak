@@ -33,7 +33,7 @@ function Goals() {
   const fetchGoals = async () => {
     const { data, error } = await supabase
       .from('goals')
-      .select('*')
+      .select('id, goal_type, title, description, content_standards, assessments, context_students, baseline_data, target_data, rationale, strategies, professional_learning, status, evaluator_feedback, mid_year_reflection, end_year_reflection, end_year_results, created_at')
       .eq('staff_id', profile.id)
       .order('created_at', { ascending: false })
 

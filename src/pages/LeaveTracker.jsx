@@ -47,7 +47,7 @@ function LeaveTracker() {
     // Fetch staff
     const { data: staffData } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, full_name, position_type, staff_type')
       .eq('tenant_id', profile.tenant_id)
       .in('role', ['licensed_staff', 'classified_staff'])
       .eq('is_active', true)

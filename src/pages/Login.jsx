@@ -56,7 +56,7 @@ export default function Login() {
     // Check if user has a profile
     const { data: profile } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, is_active')
       .eq('id', data.user.id)
       .single()
 

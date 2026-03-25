@@ -38,7 +38,7 @@ function Staff() {
   const fetchStaff = async () => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, full_name, email, role, position_type, staff_type, hire_date, is_active, evaluator_id, is_evaluator, assigned_rubric_id, years_at_school')
       .eq('tenant_id', profile.tenant_id)
       .in('role', ['licensed_staff', 'classified_staff'])
       .order('full_name')

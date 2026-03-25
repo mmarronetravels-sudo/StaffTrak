@@ -73,7 +73,7 @@ export default function AuthCallback() {
         // Check if profile exists
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('*, tenants(name)')
+          .select('id, tenant_id, tenants(name)')
           .eq('id', user.id)
           .single()
 
@@ -87,7 +87,7 @@ export default function AuthCallback() {
         // Check if there's a profile with this email (from CSV import)
         const { data: emailProfile } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, full_name, email')
           .eq('email', email)
           .single()
 
