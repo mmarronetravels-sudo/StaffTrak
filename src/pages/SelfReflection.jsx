@@ -31,7 +31,7 @@ function SelfReflection() {
     if (profile.assigned_rubric_id) {
       const { data, error } = await supabase
         .from('rubrics')
-        .select('*')
+        .select('id, name')
         .eq('id', profile.assigned_rubric_id)
         .single()
 
@@ -57,7 +57,7 @@ function SelfReflection() {
 
       const { data, error } = await supabase
         .from('rubrics')
-        .select('*')
+        .select('id, name')
         .eq('name', rubricName)
         .single()
 
@@ -73,7 +73,7 @@ function SelfReflection() {
 
     const { data: domainData } = await supabase
       .from('rubric_domains')
-      .select('*')
+      .select('id, name, sort_order')
       .eq('rubric_id', rubricData.id)
       .order('sort_order', { ascending: true })
 
@@ -83,7 +83,7 @@ function SelfReflection() {
       const domainIds = domainData.map(d => d.id)
       const { data: standardData } = await supabase
         .from('rubric_standards')
-        .select('*')
+        .select('id, domain_id, code, name, sort_order')
         .in('domain_id', domainIds)
         .order('sort_order', { ascending: true })
 
@@ -94,7 +94,7 @@ function SelfReflection() {
 
     const { data: existingData } = await supabase
       .from('self_assessments')
-      .select('*')
+      .select('id, rubric_id, domain_scores, content, submitted_at, created_at')
       .eq('staff_id', profile.id)
       .eq('assessment_type', 'self_reflection')
       .gte('created_at', '2025-07-01')

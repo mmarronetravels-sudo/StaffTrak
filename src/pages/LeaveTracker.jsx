@@ -56,7 +56,7 @@ function LeaveTracker() {
     // Fetch leave types
     const { data: typesData } = await supabase
       .from('leave_types')
-      .select('*')
+      .select('id, name, category, sort_order')
       .eq('tenant_id', profile.tenant_id)
       .eq('is_active', true)
       .order('sort_order')
@@ -64,21 +64,21 @@ function LeaveTracker() {
     // Fetch leave policies
     const { data: policiesData } = await supabase
       .from('leave_policies')
-      .select('*')
+      .select('id, leave_type_id, days_per_year, weeks_per_year, tracking_unit')
       .eq('tenant_id', profile.tenant_id)
       .eq('school_year', schoolYear)
 
     // Fetch leave balances
     const { data: balancesData } = await supabase
       .from('leave_balances')
-      .select('*')
+      .select('id, staff_id, leave_type_id, allocated, used, carried_over, school_year')
       .eq('tenant_id', profile.tenant_id)
       .eq('school_year', schoolYear)
 
     // Fetch leave entries
     const { data: entriesData } = await supabase
       .from('leave_entries')
-      .select('*')
+      .select('id, staff_id, leave_type_id, start_date, end_date, amount, tracking_unit, concurrent_leave_type_id, reason, documentation_on_file, school_year')
       .eq('tenant_id', profile.tenant_id)
       .eq('school_year', schoolYear)
       .order('start_date', { ascending: false })

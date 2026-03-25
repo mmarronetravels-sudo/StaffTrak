@@ -73,7 +73,7 @@ function SummativeEvaluation() {
     if (staffData.assigned_rubric_id) {
       const { data, error } = await supabase
         .from('rubrics')
-        .select('*')
+        .select('id, name, staff_type')
         .eq('id', staffData.assigned_rubric_id)
         .single()
 
@@ -86,7 +86,7 @@ function SummativeEvaluation() {
     if (!rubricData) {
       let rubricQuery = supabase
         .from('rubrics')
-        .select('*')
+        .select('id, name, staff_type')
         .eq('staff_type', staffData.staff_type)
         .eq('is_active', true)
 
@@ -108,7 +108,7 @@ function SummativeEvaluation() {
       // Fetch domains
       const { data: domainData } = await supabase
         .from('rubric_domains')
-        .select('*')
+        .select('id, name, sort_order')
         .eq('rubric_id', rubricData.id)
         .order('sort_order')
 
@@ -119,7 +119,7 @@ function SummativeEvaluation() {
         const domainIds = domainData.map(d => d.id)
         const { data: standardData } = await supabase
           .from('rubric_standards')
-          .select('*')
+          .select('id, domain_id, code, name, sort_order')
           .in('domain_id', domainIds)
           .order('sort_order')
 
@@ -133,7 +133,7 @@ function SummativeEvaluation() {
   const fetchExistingEvaluation = async (staffId) => {
     const { data } = await supabase
       .from('summative_evaluations')
-      .select('*')
+      .select('id, staff_id, evaluator_id, status, domain_scores, areas_of_strength, areas_for_growth, recommended_support, additional_comments, overall_score, overall_rating, created_at')
       .eq('staff_id', staffId)
       .eq('evaluator_id', profile.id)
       .order('created_at', { ascending: false })
@@ -154,26 +154,26 @@ function SummativeEvaluation() {
     // Fetch goals
     const { data: goalsData } = await supabase
       .from('goals')
-      .select('*')
+      .select('id, title, goal_type, final_score, created_at')
       .eq('staff_id', staffId)
       .order('created_at')
-    
+
     if (goalsData) setGoals(goalsData)
-    
+
     // Fetch observations
     const { data: obsData } = await supabase
       .from('observations')
-      .select('*')
+      .select('id, observation_type, scheduled_at')
       .eq('staff_id', staffId)
       .eq('status', 'completed')
       .order('scheduled_at')
-    
+
     if (obsData) setObservations(obsData)
-    
+
     // Fetch self-reflection
     const { data: reflectionData } = await supabase
       .from('self_assessments')
-      .select('*')
+      .select('id, overall_score, created_at')
       .eq('staff_id', staffId)
       .order('created_at', { ascending: false })
       .limit(1)

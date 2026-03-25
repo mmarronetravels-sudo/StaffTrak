@@ -130,7 +130,7 @@ function ObservationSession() {
       // Fetch domains
       const { data: domainData } = await supabase
         .from('rubric_domains')
-        .select('*')
+        .select('id, name, sort_order')
         .eq('rubric_id', rubricData.id)
         .order('sort_order', { ascending: true })
 
@@ -141,7 +141,7 @@ function ObservationSession() {
         const domainIds = domainData.map(d => d.id)
         const { data: standardData } = await supabase
           .from('rubric_standards')
-          .select('*')
+          .select('id, domain_id, code, name, sort_order')
           .in('domain_id', domainIds)
           .order('sort_order', { ascending: true })
 

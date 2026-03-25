@@ -48,32 +48,32 @@ function Reports() {
     // Fetch observations — scoped to tenant staff
     const { data: obsData } = await supabase
       .from('observations')
-      .select('*')
+      .select('id, staff_id, observer_id, status, created_at')
       .in('staff_id', tenantStaffIds)
       .order('created_at', { ascending: false })
 
     // Fetch evaluations — scoped to tenant staff
     const { data: evalData } = await supabase
       .from('summative_evaluations')
-      .select('*')
+      .select('id, staff_id, evaluator_id, status, overall_score, overall_rating, completed_at')
       .in('staff_id', tenantStaffIds)
 
     // Fetch goals — scoped to tenant staff
     const { data: goalsData } = await supabase
       .from('goals')
-      .select('*')
+      .select('id, staff_id, status')
       .in('staff_id', tenantStaffIds)
 
     // Fetch self assessments — scoped to tenant staff
     const { data: selfData } = await supabase
       .from('self_assessments')
-      .select('*')
+      .select('id, staff_id, submitted_at')
       .in('staff_id', tenantStaffIds)
 
     // Fetch meetings — scoped to tenant staff
     const { data: meetingsData } = await supabase
       .from('meetings')
-      .select('*')
+      .select('id, staff_id, meeting_type, status')
       .in('staff_id', tenantStaffIds)
 
     setData({

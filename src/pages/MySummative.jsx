@@ -43,7 +43,7 @@ function MySummative() {
         if (domainIds.length > 0) {
           const { data: domainData } = await supabase
             .from('rubric_domains')
-            .select('*')
+            .select('id, name, sort_order')
             .in('id', domainIds)
             .order('sort_order')
           

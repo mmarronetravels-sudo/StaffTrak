@@ -61,7 +61,7 @@ function MeetingSession() {
     // Fetch self-reflection
     const { data: reflectionData } = await supabase
       .from('self_assessments')
-      .select('*')
+      .select('id, rubric_id, domain_scores, content, submitted_at, created_at')
       .eq('staff_id', staffId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -74,15 +74,15 @@ function MeetingSession() {
       if (reflectionData.rubric_id) {
         const { data: domains } = await supabase
           .from('rubric_domains')
-          .select('*')
+          .select('id, name, sort_order')
           .eq('rubric_id', reflectionData.rubric_id)
           .order('sort_order')
-        
+
         if (domains) {
           const domainIds = domains.map(d => d.id)
           const { data: standards } = await supabase
             .from('rubric_standards')
-            .select('*')
+            .select('id, domain_id, code, name, sort_order')
             .in('domain_id', domainIds)
             .order('sort_order')
           
@@ -94,7 +94,7 @@ function MeetingSession() {
     // Fetch goals
     const { data: goalsData } = await supabase
       .from('goals')
-      .select('*')
+      .select('id, title, goal_type, status, created_at')
       .eq('staff_id', staffId)
       .order('created_at', { ascending: false })
     
@@ -106,7 +106,7 @@ function MeetingSession() {
     if (meetingType === 'mid_year_review' || meetingType === 'end_year_review') {
       const { data: obsData } = await supabase
         .from('observations')
-        .select('*')
+        .select('id, observation_type, status, scheduled_at, feedback')
         .eq('staff_id', staffId)
         .order('scheduled_at', { ascending: false })
       

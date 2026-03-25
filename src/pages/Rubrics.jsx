@@ -19,7 +19,7 @@ function Rubrics() {
   const fetchRubrics = async () => {
     const { data, error } = await supabase
       .from('rubrics')
-      .select('*')
+      .select('id, name, description, staff_type')
       .order('staff_type', { ascending: true })
       .order('name', { ascending: true })
 
@@ -44,7 +44,7 @@ function Rubrics() {
     // Fetch domains for this rubric
     const { data: domainData, error: domainError } = await supabase
       .from('rubric_domains')
-      .select('*')
+      .select('id, name, sort_order')
       .eq('rubric_id', rubric.id)
       .order('sort_order', { ascending: true })
 
@@ -55,7 +55,7 @@ function Rubrics() {
       const domainIds = domainData.map(d => d.id)
       const { data: standardData, error: standardError } = await supabase
         .from('rubric_standards')
-        .select('*')
+        .select('id, domain_id, code, name, sort_order')
         .in('domain_id', domainIds)
         .order('sort_order', { ascending: true })
 

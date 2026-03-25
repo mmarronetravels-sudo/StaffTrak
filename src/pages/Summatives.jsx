@@ -35,7 +35,7 @@ function Summatives() {
       if (staffIds.length > 0) {
         const { data: evalData } = await supabase
           .from('summative_evaluations')
-          .select('*')
+          .select('id, staff_id, evaluator_id, status, overall_score, overall_rating')
           .in('staff_id', staffIds)
           .eq('evaluator_id', profile.id)
 
