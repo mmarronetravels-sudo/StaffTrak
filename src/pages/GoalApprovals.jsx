@@ -71,9 +71,9 @@ function GoalApprovals() {
           goalTitle: goal.title,
           evaluatorName: profile.full_name
         })
-        console.log('Approval email sent to', goal.staff?.email)
+        // Email sent successfully
       } catch (emailError) {
-        console.error('Failed to send approval email:', emailError)
+        console.error('Failed to send approval email')
         // Don't block the approval if email fails
       }
 
@@ -110,9 +110,9 @@ function GoalApprovals() {
           evaluatorName: profile.full_name,
           feedback: feedback
         })
-        console.log('Revision request email sent to', goal.staff?.email)
+        // Email sent successfully
       } catch (emailError) {
-        console.error('Failed to send revision email:', emailError)
+        console.error('Failed to send revision email')
         // Don't block the revision request if email fails
       }
 

@@ -38,26 +38,31 @@ function SummativeEvaluation() {
   }, [staffId, profile])
 
   const fetchData = async () => {
-    // Fetch staff member
+    // Fetch staff member — verify they belong to the same tenant
     const { data: staffData } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', staffId)
+      .eq('tenant_id', profile.tenant_id)
       .single()
-    
-    if (staffData) {
-      setStaff(staffData)
-      
-      // Fetch rubric based on staff type/position
-      await fetchRubric(staffData)
-      
-      // Fetch existing evaluation if any
-      await fetchExistingEvaluation(staffId)
-      
-      // Fetch context data
-      await fetchContextData(staffId)
+
+    if (!staffData) {
+      // Staff not found or not in this tenant — redirect
+      navigate('/summatives')
+      return
     }
-    
+
+    setStaff(staffData)
+
+    // Fetch rubric based on staff type/position
+    await fetchRubric(staffData)
+
+    // Fetch existing evaluation if any
+    await fetchExistingEvaluation(staffId)
+
+    // Fetch context data
+    await fetchContextData(staffId)
+
     setLoading(false)
   }
 

@@ -57,8 +57,11 @@ export default function AuthCallback() {
         const { user } = currentSession
         const email = user.email?.toLowerCase()
 
-        // Check for allowed domains (configurable)
-        const allowedDomains = ['summitlc.org', 'scholarpathsystems.org']
+        // Check for allowed domains (configured via environment variable)
+        const allowedDomains = (import.meta.env.VITE_ALLOWED_DOMAINS || '')
+          .split(',')
+          .map(d => d.trim().toLowerCase())
+          .filter(Boolean)
         const userDomain = email?.split('@')[1]
         
         if (allowedDomains.length > 0 && !allowedDomains.includes(userDomain)) {

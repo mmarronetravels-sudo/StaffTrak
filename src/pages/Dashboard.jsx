@@ -236,12 +236,17 @@ function Dashboard() {
         .eq('observer_id', profile.id)
         .in('status', ['scheduled', 'in_progress'])
 
-      const { data: pendingGoals } = await supabase
-        .from('goals')
-        .select('*, profiles!goals_staff_id_fkey(evaluator_id)')
-        .eq('status', 'submitted')
+      // Scope pending goals to staff assigned to this evaluator
+      const assignedStaffIds = assignedStaff?.map(s => s.id) || []
+      const { data: pendingGoals } = assignedStaffIds.length > 0
+        ? await supabase
+            .from('goals')
+            .select('*')
+            .in('staff_id', assignedStaffIds)
+            .eq('status', 'submitted')
+        : { data: [] }
 
-      const pendingForMe = pendingGoals?.filter(g => g.profiles?.evaluator_id === profile.id) || []
+      const pendingForMe = pendingGoals || []
 
       const { data: upcomingObs } = await supabase
         .from('observations')

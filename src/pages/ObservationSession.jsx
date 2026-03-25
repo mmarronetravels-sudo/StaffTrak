@@ -75,7 +75,13 @@ function ObservationSession() {
       .single()
 
     if (obsError || !obsData) {
-      console.error('Error fetching observation:', obsError)
+      console.error('Error fetching observation')
+      navigate('/observations')
+      return
+    }
+
+    // Verify the current user is the observer or the staff being observed
+    if (obsData.observer_id !== profile.id && obsData.staff_id !== profile.id) {
       navigate('/observations')
       return
     }

@@ -190,15 +190,38 @@ if (p.includes('cultural liaison')) return 'cultural_liaison'
   }
 
   // --- File Upload Handler ---
+  const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+  const MAX_ROWS = 2000
+
   const handleFileUpload = (e) => {
     const file = e.target.files[0]
     if (!file) return
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      alert('Please upload a CSV file.')
+      e.target.value = ''
+      return
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      alert('File is too large. Maximum size is 5MB.')
+      e.target.value = ''
+      return
+    }
+
     setFileName(file.name)
 
     const reader = new FileReader()
     reader.onload = (event) => {
       const text = event.target.result
       const raw = parseCSV(text)
+
+      if (raw.length > MAX_ROWS) {
+        alert(`File contains ${raw.length} rows. Maximum is ${MAX_ROWS}.`)
+        setFileName('')
+        return
+      }
+
       setRawData(raw)
 
       // Transform each row

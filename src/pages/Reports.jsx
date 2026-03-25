@@ -26,45 +26,55 @@ function Reports() {
   const fetchAllData = async () => {
     setLoading(true)
     
-    // Fetch all staff (for reports)
+    // Fetch all staff (for reports) — scoped to tenant
     const { data: staffData } = await supabase
       .from('profiles')
       .select('*')
+      .eq('tenant_id', profile.tenant_id)
       .in('role', ['licensed_staff', 'classified_staff'])
       .eq('is_active', true)
       .order('full_name')
 
-    // Fetch all profiles including admins/evaluators (for name lookups)
+    // Fetch all profiles including admins/evaluators (for name lookups) — scoped to tenant
     const { data: allProfiles } = await supabase
       .from('profiles')
       .select('id, full_name, role')
+      .eq('tenant_id', profile.tenant_id)
       .eq('is_active', true)
 
-    // Fetch all observations
+    // Build staff ID list to scope related queries
+    const tenantStaffIds = staffData?.map(s => s.id) || []
+
+    // Fetch observations — scoped to tenant staff
     const { data: obsData } = await supabase
       .from('observations')
       .select('*')
+      .in('staff_id', tenantStaffIds)
       .order('created_at', { ascending: false })
 
-    // Fetch all evaluations
+    // Fetch evaluations — scoped to tenant staff
     const { data: evalData } = await supabase
       .from('summative_evaluations')
       .select('*')
+      .in('staff_id', tenantStaffIds)
 
-    // Fetch all goals
+    // Fetch goals — scoped to tenant staff
     const { data: goalsData } = await supabase
       .from('goals')
       .select('*')
+      .in('staff_id', tenantStaffIds)
 
-    // Fetch self assessments
+    // Fetch self assessments — scoped to tenant staff
     const { data: selfData } = await supabase
       .from('self_assessments')
       .select('*')
+      .in('staff_id', tenantStaffIds)
 
-    // Fetch meetings
+    // Fetch meetings — scoped to tenant staff
     const { data: meetingsData } = await supabase
       .from('meetings')
       .select('*')
+      .in('staff_id', tenantStaffIds)
 
     setData({
       staff: staffData || [],

@@ -41,10 +41,16 @@ function MeetingSession() {
       .single()
 
     if (!error && data) {
+      // Verify the current user is the evaluator or the staff member
+      if (data.evaluator_id !== profile.id && data.staff_id !== profile.id) {
+        navigate('/dashboard')
+        return
+      }
+
       setMeeting(data)
       setNotes(data.notes || '')
       setActionItems(data.action_items || '')
-      
+
       // Fetch context data based on meeting type
       fetchContextData(data.staff_id, data.meeting_type)
     }
