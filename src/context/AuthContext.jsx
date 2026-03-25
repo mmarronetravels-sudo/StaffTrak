@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext({});
+const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -92,6 +93,29 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut();
     window.location.href = '/login';
   };
+
+  // Idle timeout — sign out after 60 minutes of no activity
+  const idleTimer = useRef(null);
+
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => {
+      if (user) signOut();
+    }, IDLE_TIMEOUT_MS);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, resetIdleTimer));
+    resetIdleTimer(); // start the timer
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetIdleTimer));
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+    };
+  }, [user, resetIdleTimer]);
 
   const isAdmin = profile?.role === 'district_admin' || profile?.role === 'school_admin';
   const isEvaluator = profile?.is_evaluator === true || isAdmin;
