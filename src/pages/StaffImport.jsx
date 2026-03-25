@@ -277,47 +277,60 @@ if (p.includes('cultural liaison')) return 'cultural_liaison'
     ))
   }
 
-  // --- Import ---
+  // --- Import via Edge Function ---
   const handleImport = async () => {
     setStep(3)
     const toImport = parsedData.filter(r => r._include)
-    let success = 0
-    let skipped = 0
-    const errors = []
 
-    for (const row of toImport) {
-      try {
-        const { error } = await supabase
-          .from('profiles')
-          .insert([{
-            full_name: row.full_name,
-            email: row.email,
-            role: row.role,
-            staff_type: row.staff_type,
-            position_type: row.position_type,
-            hire_date: row.hire_date,
-            years_at_school: row.years_at_school,
-            is_evaluator: row.is_evaluator,
-            tenant_id: profile.tenant_id,
-            is_active: true
-          }])
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
 
-        if (error) {
-          if (error.message?.includes('duplicate') || error.message?.includes('unique')) {
-            skipped++
-            errors.push({ name: row.full_name, error: 'Already exists (duplicate email)' })
-          } else {
-            errors.push({ name: row.full_name, error: error.message })
-          }
-        } else {
-          success++
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/import-staff`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({
+            rows: toImport.map(row => ({
+              full_name: row.full_name,
+              email: row.email,
+              role: row.role,
+              staff_type: row.staff_type,
+              position_type: row.position_type,
+              hire_date: row.hire_date,
+              years_at_school: row.years_at_school,
+              is_evaluator: row.is_evaluator,
+            }))
+          }),
         }
-      } catch (err) {
-        errors.push({ name: row.full_name, error: err.message })
+      )
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        setImportResults({
+          success: 0,
+          skipped: 0,
+          errors: [{ name: 'Import', error: result.error || 'Import failed' }]
+        })
+      } else {
+        setImportResults({
+          success: result.success || 0,
+          skipped: result.skipped || 0,
+          errors: result.errors || []
+        })
       }
+    } catch (err) {
+      setImportResults({
+        success: 0,
+        skipped: 0,
+        errors: [{ name: 'Import', error: 'Failed to connect to import service' }]
+      })
     }
 
-    setImportResults({ success, skipped, errors })
     setStep(4)
   }
 
