@@ -28,13 +28,16 @@ export default function Navbar() {
     navigate('/login')
   }
 
-  const handleSwitchToTimeTrak = async (e) => {
+  const leaveTrakUrl = import.meta.env.VITE_LEAVETRAK_URL
+
+  const handleSwitchToLeaveTrak = async (e) => {
     e.preventDefault()
+    if (!leaveTrakUrl) return
     const { data: { session } } = await supabase.auth.getSession()
     if (session) {
-      window.location.href = `https://timetrak.scholarpathsystems.org/dashboard?token=${session.access_token}&refresh=${session.refresh_token}`
+      window.location.href = `${leaveTrakUrl}/dashboard?token=${session.access_token}&refresh=${session.refresh_token}`
     } else {
-      window.location.href = 'https://timetrak.scholarpathsystems.org'
+      window.location.href = leaveTrakUrl
     }
   }
 
@@ -290,15 +293,17 @@ export default function Navbar() {
                     </div>
                   </div>
 
-                  {/* Switch to TimeTrak */}
-                  <a
-                    href="https://timetrak.scholarpathsystems.org"
-                    onClick={handleSwitchToTimeTrak}
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all"
-                  >
-                    <span>🔀</span>
-                    <span>Switch to TimeTrak</span>
-                  </a>
+                  {/* Switch to LeaveTrak (only shown when bundled) */}
+                  {leaveTrakUrl && (
+                    <a
+                      href={leaveTrakUrl}
+                      onClick={handleSwitchToLeaveTrak}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all"
+                    >
+                      <span>🔀</span>
+                      <span>Switch to LeaveTrak</span>
+                    </a>
+                  )}
 
                   <div className="border-t border-gray-100 my-1" />
 
@@ -425,13 +430,15 @@ export default function Navbar() {
                 <p className="text-blue-300 text-[10px] uppercase tracking-wide">{roleLabel()}</p>
               </div>
             </div>
-            <a
-              href="https://timetrak.scholarpathsystems.org"
-              onClick={handleSwitchToTimeTrak}
-              className="block px-3 py-2 rounded-md text-sm font-semibold text-[#f3843e] hover:text-white hover:bg-white/10 transition-all"
-            >
-              🔀 Switch to TimeTrak
-            </a>
+            {leaveTrakUrl && (
+              <a
+                href={leaveTrakUrl}
+                onClick={handleSwitchToLeaveTrak}
+                className="block px-3 py-2 rounded-md text-sm font-semibold text-[#f3843e] hover:text-white hover:bg-white/10 transition-all"
+              >
+                🔀 Switch to LeaveTrak
+              </a>
+            )}
             <button
               onClick={handleSignOut}
               className="w-full text-left px-3 py-2 rounded-md text-sm font-medium text-blue-200 hover:text-white hover:bg-white/10 transition-all"
