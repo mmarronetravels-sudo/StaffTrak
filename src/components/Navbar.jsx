@@ -171,7 +171,7 @@ export default function Navbar() {
               ST
             </div>
             <div>
-              <span className="text-white font-bold text-lg tracking-tight">StaffTrak</span>
+              <span className="text-white font-bold text-lg tracking-tight">ScholarPath Staff Evaluation</span>
               <span className="text-blue-200 text-xs ml-2 hidden sm:inline">ScholarPath Systems</span>
             </div>
           </Link>
@@ -301,7 +301,7 @@ export default function Navbar() {
                       className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-all"
                     >
                       <span>🔀</span>
-                      <span>Switch to LeaveTrak</span>
+                      <span>Switch to ScholarPath Leave Management</span>
                     </a>
                   )}
 
@@ -436,7 +436,7 @@ export default function Navbar() {
                 onClick={handleSwitchToLeaveTrak}
                 className="block px-3 py-2 rounded-md text-sm font-semibold text-[#f3843e] hover:text-white hover:bg-white/10 transition-all"
               >
-                🔀 Switch to LeaveTrak
+                🔀 Switch to ScholarPath Leave Management
               </a>
             )}
             <button

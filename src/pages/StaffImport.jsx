@@ -456,7 +456,7 @@ if (p.includes('cultural liaison')) return 'cultural_liaison'
                   <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg flex items-start gap-2">
                     <span>⚠️</span>
                     <p className="text-sm text-yellow-800">
-                      <strong>{duplicateCount} duplicate(s)</strong> found — these staff already exist in StaffTrak and will be skipped.
+                      <strong>{duplicateCount} duplicate(s)</strong> found — these staff already exist in ScholarPath Staff Evaluation and will be skipped.
                     </p>
                   </div>
                 )}
@@ -624,7 +624,7 @@ if (p.includes('cultural liaison')) return 'cultural_liaison'
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <div className="w-16 h-16 border-4 border-[#2c3e7e] border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
             <h3 className="text-xl font-bold text-[#2c3e7e] mb-2">Importing Staff Members...</h3>
-            <p className="text-[#666666]">Please wait while we add {includedCount} staff members to StaffTrak.</p>
+            <p className="text-[#666666]">Please wait while we add {includedCount} staff members to ScholarPath Staff Evaluation.</p>
           </div>
         )}
 

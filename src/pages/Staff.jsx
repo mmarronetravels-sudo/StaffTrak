@@ -273,7 +273,7 @@ function Staff() {
       <nav className="bg-[#2c3e7e] shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-8">
-            <h1 className="text-xl font-bold text-white">StaffTrak</h1>
+            <h1 className="text-xl font-bold text-white">ScholarPath Staff Evaluation</h1>
             <div className="flex gap-4">
               <a href="/dashboard" className="text-white hover:text-gray-200">Dashboard</a>
               <a href="/staff" className="text-white hover:text-gray-200 font-semibold">Staff</a>

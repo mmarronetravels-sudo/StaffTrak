@@ -232,7 +232,7 @@ function Home() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="text-center">
-        <h1 className="text-4xl font-bold text-[#2c3e7e] mb-4">StaffTrak</h1>
+        <h1 className="text-4xl font-bold text-[#2c3e7e] mb-4">ScholarPath Staff Evaluation</h1>
         <p className="text-[#666666] mb-8">Staff Evaluation Management System</p>
         <a href="/login" className="bg-[#2c3e7e] text-white px-6 py-3 rounded-lg hover:bg-[#1e2a5e]">
           Sign In

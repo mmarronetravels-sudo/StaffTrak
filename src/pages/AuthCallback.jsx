@@ -132,7 +132,7 @@ export default function AuthCallback() {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-lg text-center">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-[#2c3e7e]">StaffTrak</h1>
+          <h1 className="text-2xl font-bold text-[#2c3e7e]">ScholarPath Staff Evaluation</h1>
         </div>
         
         <div className="animate-spin w-10 h-10 border-4 border-[#2c3e7e] border-t-transparent rounded-full mx-auto"></div>

@@ -261,7 +261,7 @@ function MeetingSession() {
       <nav className="bg-[#2c3e7e] shadow">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-8">
-            <h1 className="text-xl font-bold text-white">StaffTrak</h1>
+            <h1 className="text-xl font-bold text-white">ScholarPath Staff Evaluation</h1>
             <a 
               href={isEvaluator && !isStaffView ? "/meetings" : "/my-meetings"} 
               className="text-white hover:text-gray-200"

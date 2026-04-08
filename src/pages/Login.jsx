@@ -134,7 +134,7 @@ export default function Login() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-[#2c3e7e]">StaffTrak</h1>
+          <h1 className="text-3xl font-bold text-[#2c3e7e]">ScholarPath Staff Evaluation</h1>
           <p className="text-gray-500 mt-2">Staff Evaluation Management</p>
         </div>
 
@@ -238,7 +238,7 @@ export default function Login() {
         {/* Footer */}
         <div className="mt-8 pt-6 border-t border-gray-100">
           <p className="text-center text-sm text-gray-400">
-            © 2026 StaffTrak by ScholarPath Systems
+            © 2026 ScholarPath Staff Evaluation by ScholarPath Systems
           </p>
         </div>
       </div>
