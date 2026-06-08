@@ -168,10 +168,10 @@ export default function Navbar() {
               className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
               style={{ background: C.orange }}
             >
-              ST
+              SE
             </div>
             <div>
-              <span className="text-white font-bold text-lg tracking-tight">ScholarPath Staff Evaluation</span>
+              <span className="text-white font-bold text-lg tracking-tight">ScholarPath Eval</span>
               <span className="text-blue-200 text-xs ml-2 hidden sm:inline">ScholarPath Systems</span>
             </div>
           </Link>
