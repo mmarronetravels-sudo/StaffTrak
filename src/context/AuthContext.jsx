@@ -54,12 +54,18 @@ export function AuthProvider({ children }) {
 
     init();
 
-    // Auth state listener for sign out only
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Auth state listener — keep context in sync on sign in/out and token refresh
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (_event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
         setLoading(false);
+      } else if (_event === 'SIGNED_IN' || _event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          setUser(session.user);
+          // Defer Supabase call out of the auth callback to avoid deadlocks
+          setTimeout(() => { fetchProfile(session.user.id); }, 0);
+        }
       }
     });
 
