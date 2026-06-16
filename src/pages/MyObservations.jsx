@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import { obsTypeLabel } from '../lib/observationTypes'
 import { uploadEvidenceFile, openEvidenceFile } from '../lib/evidenceStorage'
+import ObservationThread from '../components/ObservationThread'
 
 function MyObservations() {
   const { profile, signOut } = useAuth()
@@ -14,6 +15,7 @@ function MyObservations() {
   const [showPostForm, setShowPostForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [lessonPlanFile, setLessonPlanFile] = useState(null)
+  const [openCounts, setOpenCounts] = useState({}) // observationId -> # of open required-response comments
 
   const [preForm, setPreForm] = useState({
     lesson_objective: '',
@@ -185,6 +187,15 @@ function MyObservations() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <h2 className="text-2xl font-bold text-[#2c3e7e] mb-6">My Observations</h2>
 
+        {(() => {
+          const totalOpen = Object.values(openCounts).reduce((a, n) => a + n, 0)
+          return totalOpen > 0 ? (
+            <div className="mb-6 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+              ⚑ You have {totalOpen} feedback comment{totalOpen !== 1 ? 's' : ''} awaiting your response. Reply below to close {totalOpen !== 1 ? 'them' : 'it'} — open items can hold up your summative.
+            </div>
+          ) : null
+        })()}
+
         {loading ? (
           <div className="text-center py-8">
             <div className="w-12 h-12 border-4 border-[#2c3e7e] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -292,6 +303,18 @@ function MyObservations() {
                             </button>
                           )}
                         </div>
+                      </div>
+
+                      {/* #4 Feedback & required-response loop */}
+                      <div className="mt-4 border-t border-gray-100 pt-3">
+                        <h4 className="text-sm font-semibold text-[#2c3e7e] mb-2">💬 Feedback &amp; Responses</h4>
+                        <ObservationThread
+                          observationId={obs.id}
+                          viewer={profile}
+                          isObserver={false}
+                          isStaff={true}
+                          onOpenCountChange={(n) => setOpenCounts((prev) => (prev[obs.id] === n ? prev : { ...prev, [obs.id]: n }))}
+                        />
                       </div>
                     </div>
                   ))}

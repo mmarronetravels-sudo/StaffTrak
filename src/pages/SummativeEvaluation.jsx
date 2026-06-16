@@ -46,6 +46,9 @@ function SummativeEvaluation() {
   const [overrideRating, setOverrideRating] = useState('')
   const [overrideJustification, setOverrideJustification] = useState('')
 
+  // #4: open required-response comments block finalizing the summative
+  const [openRequired, setOpenRequired] = useState([])
+
   const [showSubmitModal, setShowSubmitModal] = useState(false)
 
   useEffect(() => {
@@ -87,6 +90,15 @@ function SummativeEvaluation() {
     ])
     setScoredRatings(rs)
     setEvidenceTags(ev)
+
+    // #4: open required-response comments on this staff's observations (block finalize)
+    const { data: orr } = await supabase
+      .from('observation_threads')
+      .select('id, body, created_at, observation:observation_id!inner(id, subject_topic, scheduled_at, staff_id)')
+      .eq('requires_response', true)
+      .is('resolved_at', null)
+      .eq('observation.staff_id', staffId)
+    setOpenRequired(orr || [])
 
     setLoading(false)
   }
@@ -293,6 +305,11 @@ function SummativeEvaluation() {
   }
 
   const handleSubmitToStaff = async () => {
+    // #4: unanswered required-response comments block finalizing.
+    if (openRequired.length > 0) {
+      alert(`This staff member has ${openRequired.length} unanswered required-response comment(s). They must be resolved before the summative can be finalized.`)
+      return
+    }
     // Override requires a chosen rating + written justification.
     if (overrideEnabled && (!overrideRating || !overrideJustification.trim())) {
       alert('To override the calculated rating, choose a final rating and provide a written justification.')
@@ -825,6 +842,26 @@ function SummativeEvaluation() {
               </div>
             )}
 
+            {/* #4: open required-response comments block finalizing */}
+            {!isSubmitted && openRequired.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <p className="text-sm font-semibold text-amber-800 mb-1">
+                  ⚑ {openRequired.length} required-response comment{openRequired.length !== 1 ? 's' : ''} must be resolved before finalizing
+                </p>
+                <p className="text-xs text-amber-700 mb-2">
+                  The staff member needs to reply to these observation feedback comments (or you can resolve them on the observation):
+                </p>
+                <ul className="list-disc pl-5 space-y-1">
+                  {openRequired.map((o) => (
+                    <li key={o.id} className="text-xs text-amber-800">
+                      “{o.body.length > 90 ? o.body.slice(0, 90) + '…' : o.body}”
+                      {o.observation?.subject_topic ? ` — ${o.observation.subject_topic}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* Action Buttons */}
             {!isSubmitted && (
               <div className="flex gap-3">
@@ -837,7 +874,8 @@ function SummativeEvaluation() {
                 </button>
                 <button
                   onClick={() => setShowSubmitModal(true)}
-                  disabled={saving || !overallScore}
+                  disabled={saving || !overallScore || openRequired.length > 0}
+                  title={openRequired.length > 0 ? 'Resolve required-response comments first' : undefined}
                   className="flex-1 px-4 py-3 bg-[#2c3e7e] text-white rounded-lg hover:bg-[#1e2a5e] disabled:opacity-50"
                 >
                   Sign & Send to Staff

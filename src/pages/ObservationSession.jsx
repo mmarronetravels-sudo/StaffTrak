@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { obsTypeLabel } from '../lib/observationTypes'
 import { openEvidenceFile } from '../lib/evidenceStorage'
+import ObservationThread from '../components/ObservationThread'
 
 function ObservationSession() {
   const { id } = useParams()
@@ -742,6 +743,22 @@ function ObservationSession() {
                 )}
                 <div ref={notesEndRef} />
               </div>
+
+              {/* #4 Feedback & required-response loop (post-observation) */}
+              {isViewOnly && (
+                <div className="mt-6 bg-white rounded-lg shadow p-4">
+                  <h3 className="font-semibold text-[#2c3e7e] mb-1">💬 Feedback &amp; Responses</h3>
+                  <p className="text-xs text-[#666666] mb-3">
+                    Post feedback comments and flag any that require a response from {observation?.staff?.full_name || 'the staff member'}.
+                  </p>
+                  <ObservationThread
+                    observationId={id}
+                    viewer={profile}
+                    isObserver={observation?.observer_id === profile.id}
+                    isStaff={observation?.staff_id === profile.id}
+                  />
+                </div>
+              )}
             </div>
           </main>
 
