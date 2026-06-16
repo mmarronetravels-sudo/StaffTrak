@@ -22,6 +22,7 @@ import StaffImport from './pages/StaffImport'
 import AuthCallback from './pages/AuthCallback'
 import MyChecklist from './pages/MyChecklist'
 import Checklists from './pages/Checklists'
+import Calendar from './pages/Calendar'
 import LeaveTracker from './pages/LeaveTracker'
 import ODEStaffPosition from './pages/ODEStaffPosition'
 
@@ -65,9 +66,19 @@ function App() {
             } 
           />
 
+          {/* Calendar - all authenticated users (staff see own, evaluators see caseload + can schedule) */}
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <Calendar />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Self-Reflection - all authenticated users */}
-          <Route 
-            path="/self-reflection" 
+          <Route
+            path="/self-reflection"
             element={
               <ProtectedRoute>
                 <SelfReflection />

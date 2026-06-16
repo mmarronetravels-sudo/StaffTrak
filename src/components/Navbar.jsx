@@ -193,6 +193,20 @@ export default function Navbar() {
               🏠 Dashboard
             </Link>
 
+            {/* Calendar — everyone except pure HR */}
+            {!isHR && (
+              <Link
+                to="/calendar"
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  isActive('/calendar')
+                    ? 'bg-white/20 text-white'
+                    : 'text-blue-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                📅 Calendar
+              </Link>
+            )}
+
             {/* My Evaluation — staff + evaluators/admins (anyone who has personal eval pages) */}
             {!isHR && (
               <DropdownMenu
@@ -351,6 +365,19 @@ export default function Navbar() {
           >
             🏠 Dashboard
           </Link>
+
+          {/* Calendar */}
+          {!isHR && (
+            <Link
+              to="/calendar"
+              onClick={() => setMobileOpen(false)}
+              className={`block px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                isActive('/calendar') ? 'bg-white/20 text-white' : 'text-blue-200 hover:text-white hover:bg-white/10'
+              }`}
+            >
+              📅 Calendar
+            </Link>
+          )}
 
           {/* My Evaluation section */}
           {!isHR && (
