@@ -6,6 +6,15 @@ import { notifyEvaluationReady } from '../services/emailService'
 import { SummativePDFDownload } from '../components/SummativePDF'
 import Navbar from '../components/Navbar'
 import { obsTypeLabel } from '../lib/observationTypes'
+import { fetchScoredIndicatorRatings, fetchEvidenceTagsForStaff } from '../lib/summativeRollup'
+
+const RATING_OPTIONS = ['Highly Effective', 'Effective', 'Developing', 'Needs Improvement']
+const ratingTextColor = (rating) =>
+  rating === 'Highly Effective' ? 'text-green-600'
+  : rating === 'Effective' ? 'text-blue-600'
+  : rating === 'Developing' ? 'text-yellow-600'
+  : rating === 'Needs Improvement' ? 'text-red-600'
+  : 'text-gray-600'
 
 function SummativeEvaluation() {
   const { staffId } = useParams()
@@ -29,7 +38,14 @@ function SummativeEvaluation() {
   const [areasForGrowth, setAreasForGrowth] = useState('')
   const [recommendedSupport, setRecommendedSupport] = useState('')
   const [additionalComments, setAdditionalComments] = useState('')
-  
+
+  // #8 roll-up (suggestions from the body of evidence) + professional-judgment override
+  const [scoredRatings, setScoredRatings] = useState([]) // { standard_id, rating }
+  const [evidenceTags, setEvidenceTags] = useState([])   // { id, tags:[{standard_id}] }
+  const [overrideEnabled, setOverrideEnabled] = useState(false)
+  const [overrideRating, setOverrideRating] = useState('')
+  const [overrideJustification, setOverrideJustification] = useState('')
+
   const [showSubmitModal, setShowSubmitModal] = useState(false)
 
   useEffect(() => {
@@ -63,6 +79,14 @@ function SummativeEvaluation() {
 
     // Fetch context data
     await fetchContextData(staffId)
+
+    // #8: roll-up data (scored observation ratings + evidence tags)
+    const [rs, ev] = await Promise.all([
+      fetchScoredIndicatorRatings(staffId),
+      fetchEvidenceTagsForStaff(staffId),
+    ])
+    setScoredRatings(rs)
+    setEvidenceTags(ev)
 
     setLoading(false)
   }
@@ -134,13 +158,13 @@ function SummativeEvaluation() {
   const fetchExistingEvaluation = async (staffId) => {
     const { data } = await supabase
       .from('summative_evaluations')
-      .select('id, staff_id, evaluator_id, status, domain_scores, areas_of_strength, areas_for_growth, recommended_support, additional_comments, overall_score, overall_rating, created_at')
+      .select('id, staff_id, evaluator_id, status, domain_scores, areas_of_strength, areas_for_growth, recommended_support, additional_comments, overall_score, overall_rating, overall_rating_override, override_justification, created_at')
       .eq('staff_id', staffId)
       .eq('evaluator_id', profile.id)
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
-    
+
     if (data) {
       setEvaluation(data)
       setDomainScores(data.domain_scores || {})
@@ -148,6 +172,9 @@ function SummativeEvaluation() {
       setAreasForGrowth(data.areas_for_growth || '')
       setRecommendedSupport(data.recommended_support || '')
       setAdditionalComments(data.additional_comments || '')
+      setOverrideEnabled(!!data.overall_rating_override)
+      setOverrideRating(data.overall_rating_override || '')
+      setOverrideJustification(data.override_justification || '')
     }
   }
 
@@ -211,17 +238,27 @@ function SummativeEvaluation() {
     return 'Needs Improvement'
   }
 
+  // Build the override-aware rating fields shared by draft + submit.
+  const ratingFields = () => {
+    const overallScore = calculateOverallScore()
+    const calculated = getOverallRating(overallScore)
+    const useOverride = overrideEnabled && !!overrideRating
+    return {
+      overall_score: overallScore,
+      overall_rating: useOverride ? overrideRating : calculated, // EFFECTIVE final rating
+      overall_rating_override: useOverride ? overrideRating : null,
+      override_justification: useOverride ? (overrideJustification.trim() || null) : null,
+    }
+  }
+
   const handleSaveDraft = async () => {
     setSaving(true)
-    
-    const overallScore = calculateOverallScore()
-    
+
     const evalData = {
       staff_id: staffId,
       evaluator_id: profile.id,
       domain_scores: domainScores,
-      overall_score: overallScore,
-      overall_rating: getOverallRating(overallScore),
+      ...ratingFields(),
       areas_of_strength: areasOfStrength,
       areas_for_growth: areasForGrowth,
       recommended_support: recommendedSupport,
@@ -256,16 +293,18 @@ function SummativeEvaluation() {
   }
 
   const handleSubmitToStaff = async () => {
+    // Override requires a chosen rating + written justification.
+    if (overrideEnabled && (!overrideRating || !overrideJustification.trim())) {
+      alert('To override the calculated rating, choose a final rating and provide a written justification.')
+      return
+    }
     setSaving(true)
-    
-    const overallScore = calculateOverallScore()
-    
+
     const evalData = {
       staff_id: staffId,
       evaluator_id: profile.id,
       domain_scores: domainScores,
-      overall_score: overallScore,
-      overall_rating: getOverallRating(overallScore),
+      ...ratingFields(),
       areas_of_strength: areasOfStrength,
       areas_for_growth: areasForGrowth,
       recommended_support: recommendedSupport,
@@ -326,6 +365,21 @@ function SummativeEvaluation() {
     return standards.filter(s => s.domain_id === domainId)
   }
 
+  // #8: suggested domain score from scored observation indicator ratings.
+  const domainSuggestion = (domainId) => {
+    const sIds = getStandardsForDomain(domainId).map(s => s.id)
+    const rs = scoredRatings.filter(r => sIds.includes(r.standard_id))
+    if (!rs.length) return null
+    const avg = rs.reduce((a, r) => a + r.rating, 0) / rs.length
+    return { avg: avg.toFixed(2), rounded: Math.round(avg), label: getOverallRating(avg), count: rs.length }
+  }
+
+  // #8: how many evidence items touch any indicator in this domain.
+  const domainEvidenceCount = (domainId) => {
+    const sIds = new Set(getStandardsForDomain(domainId).map(s => s.id))
+    return evidenceTags.filter(it => (it.tags || []).some(t => sIds.has(t.standard_id))).length
+  }
+
   const formatDate = (dateStr) => {
     if (!dateStr) return ''
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -338,6 +392,15 @@ function SummativeEvaluation() {
   const overallScore = calculateOverallScore()
   const overallRating = getOverallRating(overallScore)
   const isSubmitted = evaluation?.status === 'pending_staff_signature' || evaluation?.status === 'completed'
+
+  // #8 professional-judgment override: the EFFECTIVE final rating.
+  const computedRating = overallRating
+  const overrideActive = isSubmitted
+    ? !!evaluation?.overall_rating_override
+    : (overrideEnabled && !!overrideRating)
+  const effectiveRating = overrideActive
+    ? (isSubmitted ? evaluation.overall_rating_override : overrideRating)
+    : computedRating
 
   if (loading) {
     return (
@@ -392,13 +455,12 @@ function SummativeEvaluation() {
                 <div className="text-center bg-gray-50 px-6 py-3 rounded-lg">
                   <p className="text-sm text-[#666666]">Overall Score</p>
                   <p className="text-3xl font-bold text-[#2c3e7e]">{overallScore}</p>
-                  <p className={`text-sm font-medium ${
-                    overallRating === 'Highly Effective' ? 'text-green-600' :
-                    overallRating === 'Effective' ? 'text-blue-600' :
-                    overallRating === 'Developing' ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    {overallRating}
+                  <p className={`text-sm font-medium ${ratingTextColor(effectiveRating)}`}>
+                    {effectiveRating}
                   </p>
+                  {overrideActive && (
+                    <p className="text-[10px] text-amber-600 mt-0.5">override · calculated {computedRating}</p>
+                  )}
                 </div>
                 {isSubmitted && (
                   <SummativePDFDownload
@@ -538,7 +600,36 @@ function SummativeEvaluation() {
                         ))}
                       </div>
                     </div>
-                    
+
+                    {/* #8 Roll-up: suggestion from the body of evidence */}
+                    {(() => {
+                      const sug = domainSuggestion(domain.id)
+                      const ev = domainEvidenceCount(domain.id)
+                      if (!sug && ev === 0) return null
+                      return (
+                        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs bg-blue-50 border border-blue-100 rounded p-2">
+                          {sug ? (
+                            <>
+                              <span className="font-medium text-[#2c3e7e]">From observations:</span>
+                              <span className={`px-1.5 py-0.5 rounded ${getScoreColor(parseFloat(sug.avg))}`}>{sug.avg} avg · {sug.label}</span>
+                              <span className="text-[#666666]">({sug.count} indicator rating{sug.count !== 1 ? 's' : ''}, scored only)</span>
+                              {!isSubmitted && (
+                                <button
+                                  onClick={() => handleDomainScoreChange(domain.id, 'score', sug.rounded)}
+                                  className="px-2 py-0.5 rounded bg-[#477fc1] text-white hover:bg-[#3a6ca8]"
+                                >
+                                  Use {sug.rounded}
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-[#666666]">No scored observation ratings for this domain yet.</span>
+                          )}
+                          {ev > 0 && <span className="text-[#666666]">· {ev} evidence item{ev !== 1 ? 's' : ''}</span>}
+                        </div>
+                      )
+                    })()}
+
                     {/* Domain Feedback */}
                     <textarea
                       value={domainScores[domain.id]?.feedback || ''}
@@ -562,6 +653,70 @@ function SummativeEvaluation() {
                     </details>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* #8 Overall Rating + professional-judgment override */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="p-4 border-b border-gray-100">
+                <h3 className="font-semibold text-[#2c3e7e]">⭐ Overall Rating</h3>
+                <p className="text-sm text-[#666666]">Calculated from the domain scores. You may override it with professional judgment.</p>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm text-[#666666]">Calculated:</span>
+                  <span className="font-bold text-[#2c3e7e]">{overallScore || '—'}</span>
+                  {computedRating && <span className={`text-sm font-medium ${ratingTextColor(computedRating)}`}>{computedRating}</span>}
+                </div>
+
+                {!isSubmitted ? (
+                  <>
+                    <label className="flex items-center gap-2 text-sm text-[#666666] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={overrideEnabled}
+                        onChange={(e) => setOverrideEnabled(e.target.checked)}
+                        className="rounded text-[#477fc1]"
+                      />
+                      Override the calculated rating (professional judgment)
+                    </label>
+                    {overrideEnabled && (
+                      <div className="space-y-2 pl-6">
+                        <select
+                          value={overrideRating}
+                          onChange={(e) => setOverrideRating(e.target.value)}
+                          className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
+                        >
+                          <option value="">Select final rating…</option>
+                          {RATING_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                        <textarea
+                          value={overrideJustification}
+                          onChange={(e) => setOverrideJustification(e.target.value)}
+                          rows="3"
+                          placeholder="Justification (required when overriding the calculated rating)…"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
+                        />
+                        <p className="text-xs text-[#666666]">A written justification is required when the final rating differs from the calculated score.</p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  evaluation?.overall_rating_override ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded p-3">
+                      <p className="text-sm">
+                        <span className="font-medium text-[#2c3e7e]">Final rating (professional-judgment override):</span>{' '}
+                        <span className={`font-medium ${ratingTextColor(evaluation.overall_rating_override)}`}>{evaluation.overall_rating_override}</span>
+                      </p>
+                      <p className="text-xs text-[#666666] mt-0.5">Calculated rating was {computedRating}.</p>
+                      {evaluation.override_justification && (
+                        <p className="text-sm text-[#666666] mt-2"><span className="font-medium">Justification:</span> {evaluation.override_justification}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[#666666]">No override — the final rating is the calculated rating.</p>
+                  )
+                )}
               </div>
             </div>
 
@@ -708,9 +863,12 @@ function SummativeEvaluation() {
                   <span className="font-bold text-[#2c3e7e]">{overallScore}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-[#666666]">Rating:</span>
-                  <span className="font-medium">{overallRating}</span>
+                  <span className="text-sm text-[#666666]">Final Rating:</span>
+                  <span className={`font-medium ${ratingTextColor(effectiveRating)}`}>{effectiveRating}</span>
                 </div>
+                {overrideActive && (
+                  <p className="text-xs text-amber-600 mt-1 text-right">Professional-judgment override (calculated: {computedRating})</p>
+                )}
               </div>
               <p className="text-sm text-[#666666] mb-6">
                 The staff member will be able to add comments and sign off.

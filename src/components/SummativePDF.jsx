@@ -204,6 +204,11 @@ const SummativePDFDocument = ({ evaluation, staff, evaluator, domains, schoolNam
         <View>
           <Text style={styles.scoreRating}>{evaluation?.overall_rating || 'N/A'}</Text>
           <Text style={{ fontSize: 9, color: '#666666' }}>Overall Rating</Text>
+          {evaluation?.overall_rating_override && (
+            <Text style={{ fontSize: 8, color: '#b45309', marginTop: 2 }}>
+              Professional-judgment override (calculated: {getRating(evaluation.overall_score)})
+            </Text>
+          )}
         </View>
       </View>
 
@@ -260,6 +265,13 @@ const SummativePDFDocument = ({ evaluation, staff, evaluator, domains, schoolNam
           <View style={styles.feedbackBox}>
             <Text style={styles.feedbackLabel}>Additional Comments</Text>
             <Text style={styles.feedbackText}>{evaluation.additional_comments}</Text>
+          </View>
+        )}
+
+        {evaluation?.overall_rating_override && evaluation?.override_justification && (
+          <View style={styles.feedbackBox}>
+            <Text style={styles.feedbackLabel}>Overall Rating Override — Justification</Text>
+            <Text style={styles.feedbackText}>{evaluation.override_justification}</Text>
           </View>
         )}
       </View>

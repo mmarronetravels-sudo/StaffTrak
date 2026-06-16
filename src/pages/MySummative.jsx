@@ -116,6 +116,16 @@ function MySummative() {
     }
   }
 
+  // Calculated rating from the average (to show what the override adjusted from).
+  const getRating = (score) => {
+    if (!score) return 'N/A'
+    const s = parseFloat(score)
+    if (s >= 3.5) return 'Highly Effective'
+    if (s >= 2.5) return 'Effective'
+    if (s >= 1.5) return 'Developing'
+    return 'Needs Improvement'
+  }
+
   const formatDate = (dateStr) => {
     if (!dateStr) return ''
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -201,7 +211,12 @@ function MySummative() {
                 <p className={`text-xl font-semibold ${getRatingColor(evaluation.overall_rating)}`}>
                   {evaluation.overall_rating}
                 </p>
-                
+                {evaluation.overall_rating_override && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Professional-judgment rating (calculated: {getRating(evaluation.overall_score)})
+                  </p>
+                )}
+
                 {/* PDF Download Button */}
                 <div className="mt-4">
                   <SummativePDFDownload
@@ -276,6 +291,15 @@ function MySummative() {
                     <h4 className="text-sm font-semibold text-[#2c3e7e] mb-1">Additional Comments</h4>
                     <p className="text-sm text-[#666666] bg-gray-50 p-3 rounded-lg">
                       {evaluation.additional_comments}
+                    </p>
+                  </div>
+                )}
+
+                {evaluation.overall_rating_override && evaluation.override_justification && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-amber-700 mb-1">Overall Rating — Evaluator Justification</h4>
+                    <p className="text-sm text-[#666666] bg-amber-50 p-3 rounded-lg">
+                      {evaluation.override_justification}
                     </p>
                   </div>
                 )}
