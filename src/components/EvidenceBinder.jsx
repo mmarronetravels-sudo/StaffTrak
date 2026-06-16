@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabaseClient'
 import { loadRubricForStaff } from '../lib/evidenceRubric'
 import { obsTypeLabel } from '../lib/observationTypes'
+import { uploadEvidenceFile, removeEvidenceFile, openEvidenceFile } from '../lib/evidenceStorage'
 
 // 1-4 rating labels — same scale as the summative / observation ratings.
 const RATING_LABEL = { 1: 'Needs Improvement', 2: 'Developing', 3: 'Effective', 4: 'Highly Effective' }
@@ -16,7 +17,7 @@ const fmtDate = (d) =>
 
 const NOTE_ICON = { strength: '💪', growth_area: '🌱', question: '❓', general: '📝' }
 
-const EMPTY_FORM = { evidence_type: 'note', title: '', description: '', url: '', occurred_on: '', is_formative_only: false }
+const EMPTY_FORM = { evidence_type: 'note', title: '', description: '', url: '', occurred_on: '', is_formative_only: false, file: null }
 
 /**
  * Body of evidence for one staff member, organized by rubric domain → indicator.
@@ -135,8 +136,22 @@ export default function EvidenceBinder({ staffId, viewer, canContribute }) {
   }
 
   const saveAdd = async (sid) => {
-    if (!form.title.trim()) return
+    const isFile = form.evidence_type === 'file'
+    const title = form.title.trim() || (isFile && form.file ? form.file.name : '')
+    if (!title) return
+    if (isFile && !form.file) { alert('Choose a file to upload.'); return }
     setBusy(true)
+
+    // Upload the file first (if any), so we can store its path.
+    let fileMeta = { file_path: null, file_name: null, file_type: null, file_size: null }
+    if (isFile) {
+      const { path, error: upErr } = await uploadEvidenceFile(form.file, {
+        tenantId: staff.tenant_id, staffId, subdir: 'evidence',
+      })
+      if (upErr) { alert(`Upload failed: ${upErr.message}`); setBusy(false); return }
+      fileMeta = { file_path: path, file_name: form.file.name, file_type: form.file.type || null, file_size: form.file.size || null }
+    }
+
     const { data: item, error } = await supabase
       .from('evidence_items')
       .insert({
@@ -144,16 +159,20 @@ export default function EvidenceBinder({ staffId, viewer, canContribute }) {
         staff_id: staffId,
         cycle_id: cycle?.id || null,
         created_by: viewer.id,
-        title: form.title.trim(),
+        title,
         description: form.description.trim() || null,
         evidence_type: form.evidence_type,
         url: form.evidence_type === 'link' ? (form.url.trim() || null) : null,
         occurred_on: form.occurred_on || null,
         is_formative_only: form.is_formative_only,
+        ...fileMeta,
       })
       .select('*')
       .single()
-    if (error) { alert(`Could not add evidence: ${error.message}`); setBusy(false); return }
+    if (error) {
+      if (fileMeta.file_path) removeEvidenceFile(fileMeta.file_path) // roll back the upload
+      alert(`Could not add evidence: ${error.message}`); setBusy(false); return
+    }
 
     const { error: tagErr } = await supabase
       .from('evidence_indicator_tags')
@@ -202,6 +221,7 @@ export default function EvidenceBinder({ staffId, viewer, canContribute }) {
     setBusy(true)
     const { error } = await supabase.from('evidence_items').delete().eq('id', it.id)
     if (error) { alert(`Could not delete: ${error.message}`); setBusy(false); return }
+    if (it.evidence_type === 'file' && it.file_path) removeEvidenceFile(it.file_path) // best-effort
     setItems((prev) => prev.filter((x) => x.id !== it.id))
     setBusy(false)
   }
@@ -226,20 +246,32 @@ export default function EvidenceBinder({ staffId, viewer, canContribute }) {
     )
   }
 
-  const TypeForm = ({ value, onChange }) => (
+  const TypeForm = ({ value, onChange, allowTypeChange = true }) => (
     <div className="space-y-2">
-      <div className="flex gap-2">
-        {[['note', '📝 Note'], ['link', '🔗 Link']].map(([v, label]) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => onChange({ ...value, evidence_type: v })}
-            className={`px-3 py-1 rounded text-sm ${value.evidence_type === v ? 'bg-[#2c3e7e] text-white' : 'bg-gray-100 text-gray-700'}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {allowTypeChange && (
+        <div className="flex gap-2">
+          {[['note', '📝 Note'], ['link', '🔗 Link'], ['file', '📎 File']].map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => onChange({ ...value, evidence_type: v })}
+              className={`px-3 py-1 rounded text-sm ${value.evidence_type === v ? 'bg-[#2c3e7e] text-white' : 'bg-gray-100 text-gray-700'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {value.evidence_type === 'file' && 'file' in value && (
+        <div>
+          <input
+            type="file"
+            onChange={(e) => onChange({ ...value, file: e.target.files?.[0] || null })}
+            className="block w-full text-sm text-[#666666] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-[#2c3e7e] file:text-white hover:file:bg-[#1e2a5e]"
+          />
+          <p className="text-[10px] text-gray-400 mt-1">Docs, images, or PDFs. The title defaults to the file name.</p>
+        </div>
+      )}
       <input
         type="text"
         value={value.title}
@@ -402,7 +434,10 @@ export default function EvidenceBinder({ staffId, viewer, canContribute }) {
                           <div key={`i-${it.id}`} className="text-sm border border-gray-200 rounded p-2">
                             {editingId === it.id ? (
                               <div>
-                                <TypeForm value={editForm} onChange={setEditForm} />
+                                {it.evidence_type === 'file' && (
+                                  <p className="text-xs text-[#666666] mb-2">📎 {it.file_name} <span className="text-gray-400">(file can’t be swapped — delete & re-add to replace)</span></p>
+                                )}
+                                <TypeForm value={editForm} onChange={setEditForm} allowTypeChange={it.evidence_type !== 'file'} />
                                 <div className="flex gap-2 mt-2">
                                   <button onClick={() => setEditingId(null)} className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-[#666666] hover:bg-gray-50">Cancel</button>
                                   <button onClick={() => saveEdit(it)} disabled={busy || !editForm.title.trim()} className="px-3 py-1.5 rounded-lg bg-[#2c3e7e] text-white text-sm hover:bg-[#1e2a5e] disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button>
@@ -412,7 +447,7 @@ export default function EvidenceBinder({ staffId, viewer, canContribute }) {
                               <>
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="flex items-center gap-2 text-xs text-[#666666] mb-0.5">
-                                    <span>{it.evidence_type === 'link' ? '🔗' : '📄'} Added evidence</span>
+                                    <span>{it.evidence_type === 'link' ? '🔗' : it.evidence_type === 'file' ? '📎' : '📄'} Added evidence</span>
                                     {it.occurred_on && <span>· {fmtDate(it.occurred_on)}</span>}
                                     {it.is_formative_only && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">formative</span>}
                                   </div>
@@ -427,6 +462,14 @@ export default function EvidenceBinder({ staffId, viewer, canContribute }) {
                                 {it.description && <p className="text-[#666666] whitespace-pre-wrap">{it.description}</p>}
                                 {it.evidence_type === 'link' && it.url && (
                                   <a href={it.url} target="_blank" rel="noopener noreferrer" className="text-[#477fc1] hover:underline break-all text-xs">{it.url}</a>
+                                )}
+                                {it.evidence_type === 'file' && it.file_path && (
+                                  <button
+                                    onClick={() => openEvidenceFile(it.file_path)}
+                                    className="mt-1 inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-[#477fc1] text-white hover:bg-[#3a6ca8]"
+                                  >
+                                    ⬇ {it.file_name || 'Download file'}
+                                  </button>
                                 )}
                               </>
                             )}

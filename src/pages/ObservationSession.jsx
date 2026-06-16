@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { obsTypeLabel } from '../lib/observationTypes'
+import { openEvidenceFile } from '../lib/evidenceStorage'
 
 function ObservationSession() {
   const { id } = useParams()
@@ -633,6 +634,17 @@ function ObservationSession() {
                       <div className="bg-yellow-50 border border-yellow-200 p-2 rounded">
                         <span className="font-medium text-[#f3843e]">🎯 Focus Areas Requested:</span>
                         <p className="text-[#666666]">{observation.pre_observation_form.focus_areas}</p>
+                      </div>
+                    )}
+                    {observation.pre_observation_form.lesson_plan_path && (
+                      <div>
+                        <span className="font-medium text-[#2c3e7e]">Lesson Plan:</span>{' '}
+                        <button
+                          onClick={() => openEvidenceFile(observation.pre_observation_form.lesson_plan_path)}
+                          className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-[#477fc1] text-white hover:bg-[#3a6ca8]"
+                        >
+                          ⬇ {observation.pre_observation_form.lesson_plan_name || 'Download'}
+                        </button>
                       </div>
                     )}
                   </div>

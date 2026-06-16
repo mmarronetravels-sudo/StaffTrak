@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import { obsTypeLabel } from '../lib/observationTypes'
+import { uploadEvidenceFile, openEvidenceFile } from '../lib/evidenceStorage'
 
 function MyObservations() {
   const { profile, signOut } = useAuth()
@@ -12,6 +13,7 @@ function MyObservations() {
   const [showPreForm, setShowPreForm] = useState(false)
   const [showPostForm, setShowPostForm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [lessonPlanFile, setLessonPlanFile] = useState(null)
 
   const [preForm, setPreForm] = useState({
     lesson_objective: '',
@@ -55,6 +57,7 @@ function MyObservations() {
 
   const openPreForm = (obs) => {
     setSelectedObs(obs)
+    setLessonPlanFile(null)
     if (obs.pre_observation_form) {
       setPreForm(obs.pre_observation_form)
     } else {
@@ -89,22 +92,38 @@ function MyObservations() {
 
   const savePreForm = async () => {
     setSaving(true)
+
+    // Upload a new lesson-plan file (if chosen) and fold its path into the form JSON.
+    let formToSave = preForm
+    if (lessonPlanFile) {
+      const { path, error: upErr } = await uploadEvidenceFile(lessonPlanFile, {
+        tenantId: profile.tenant_id, staffId: profile.id, subdir: 'preobs',
+      })
+      if (upErr) { alert(`Lesson-plan upload failed: ${upErr.message}`); setSaving(false); return }
+      formToSave = { ...preForm, lesson_plan_path: path, lesson_plan_name: lessonPlanFile.name }
+    }
+
+    const submittedAt = new Date().toISOString()
     const { error } = await supabase
       .from('observations')
       .update({
-        pre_observation_form: preForm,
-        pre_observation_submitted_at: new Date().toISOString()
+        pre_observation_form: formToSave,
+        pre_observation_submitted_at: submittedAt
       })
       .eq('id', selectedObs.id)
 
     if (!error) {
       setObservations(observations.map(o =>
         o.id === selectedObs.id
-          ? { ...o, pre_observation_form: preForm, pre_observation_submitted_at: new Date().toISOString() }
+          ? { ...o, pre_observation_form: formToSave, pre_observation_submitted_at: submittedAt }
           : o
       ))
+      setPreForm(formToSave)
+      setLessonPlanFile(null)
       setShowPreForm(false)
       setSelectedObs(null)
+    } else {
+      alert(`Could not save: ${error.message}`)
     }
     setSaving(false)
   }
@@ -358,6 +377,27 @@ function MyObservations() {
                     rows="2"
                     placeholder="What would you like the observer to focus on?"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#666666] mb-1">Lesson Plan (optional)</label>
+                  {preForm.lesson_plan_path && !lessonPlanFile && (
+                    <button
+                      type="button"
+                      onClick={() => openEvidenceFile(preForm.lesson_plan_path)}
+                      className="mb-2 inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-[#477fc1] text-white hover:bg-[#3a6ca8]"
+                    >
+                      ⬇ {preForm.lesson_plan_name || 'Current lesson plan'}
+                    </button>
+                  )}
+                  <input
+                    type="file"
+                    onChange={(e) => setLessonPlanFile(e.target.files?.[0] || null)}
+                    className="block w-full text-sm text-[#666666] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-[#2c3e7e] file:text-white hover:file:bg-[#1e2a5e]"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    {preForm.lesson_plan_path ? 'Choosing a new file replaces the current one.' : 'Attach your lesson plan (doc, PDF, etc.).'}
+                  </p>
                 </div>
               </div>
 
