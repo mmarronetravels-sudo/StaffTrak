@@ -116,7 +116,7 @@ function ObservationSession() {
 
   const fetchRubricStandards = async (staffType) => {
     // Get the appropriate rubric based on staff type
-    const rubricName = staffType === 'licensed' 
+    const rubricName = staffType === 'licensed'
       ? 'Teacher Rubric (NSQOT-Based)'
       : 'Non-Licensed 4-Domain Rubric'
 
@@ -228,6 +228,17 @@ function ObservationSession() {
     return standards.filter(s => s.domain_id === domainId)
   }
 
+  // How many notes in this observation are tagged to a given indicator (live coverage).
+  const coverageFor = (standardId) =>
+    notes.filter(n => n.tags?.some(t => t.standard?.id === standardId)).length
+
+  // How many indicators in a domain have at least one tagged note.
+  const domainCoverage = (domainId) => {
+    const stds = getStandardsForDomain(domainId)
+    const covered = stds.filter(s => coverageFor(s.id) > 0).length
+    return { covered, total: stds.length }
+  }
+
   const completeObservation = async () => {
     setSaving(true)
 
@@ -308,11 +319,65 @@ function ObservationSession() {
 
   const isViewOnly = observation?.status === 'completed'
 
+  // ── Reusable rubric panel (right side on desktop) ──
+  const RubricPanel = () => (
+    <div className="p-3 space-y-4">
+      <p className="text-xs text-[#666666]">
+        {isViewOnly ? 'Indicators evidenced in this observation.' : 'Tap an indicator to attach it to your next note.'}
+      </p>
+      {domains.length === 0 && (
+        <p className="text-sm text-[#666666]">No rubric found for this staff member.</p>
+      )}
+      {domains.map(domain => {
+        const { covered, total } = domainCoverage(domain.id)
+        return (
+          <div key={domain.id}>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-semibold text-[#2c3e7e]">{domain.name}</p>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded ${covered > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                {covered}/{total}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1">
+              {getStandardsForDomain(domain.id).map(std => {
+                const count = coverageFor(std.id)
+                const selected = selectedStandards.includes(std.id)
+                return (
+                  <button
+                    key={std.id}
+                    onClick={() => !isViewOnly && toggleStandard(std.id)}
+                    disabled={isViewOnly}
+                    className={`text-xs px-2 py-2 rounded text-left transition-colors flex items-start gap-2 ${
+                      selected
+                        ? 'bg-[#477fc1] text-white'
+                        : count > 0
+                          ? 'bg-green-50 border border-green-200 text-gray-700'
+                          : 'bg-white border border-gray-200 text-[#666666] hover:bg-gray-50'
+                    } ${isViewOnly ? 'cursor-default' : ''}`}
+                  >
+                    <span className="flex-1">
+                      <span className="font-semibold">{std.code}</span> · {std.name}
+                    </span>
+                    {count > 0 && (
+                      <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full ${selected ? 'bg-white/25 text-white' : 'bg-green-600 text-white'}`}>
+                        {count}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* Top Header - Fixed */}
-      <header className="bg-[#2c3e7e] text-white p-4 shadow-lg sticky top-0 z-20">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
+    <div className="h-screen bg-gray-100 flex flex-col">
+      {/* Top Header */}
+      <header className="bg-[#2c3e7e] text-white p-4 shadow-lg z-20 shrink-0">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div>
             <div className="flex items-center gap-3">
               <h1 className="font-semibold text-lg">
@@ -344,255 +409,276 @@ function ObservationSession() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-4xl mx-auto w-full p-4 pb-48">
-        {/* Pre-Observation Info (for formal observations) */}
-{observation?.observation_type === 'formal' && observation?.pre_observation_form && (
-  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-    <div className="flex justify-between items-center mb-3">
-      <h3 className="font-semibold text-[#2c3e7e]">📋 Pre-Observation Form</h3>
-      <button
-        onClick={() => document.getElementById('pre-obs-details').classList.toggle('hidden')}
-        className="text-sm text-[#477fc1] hover:underline"
-      >
-        Show/Hide Details
-      </button>
-    </div>
-    <div id="pre-obs-details" className="space-y-3 text-sm">
-      {observation.pre_observation_form.lesson_objective && (
-        <div>
-          <span className="font-medium text-[#2c3e7e]">Lesson Objective:</span>
-          <p className="text-[#666666]">{observation.pre_observation_form.lesson_objective}</p>
-        </div>
-      )}
-      {observation.pre_observation_form.standards_addressed && (
-        <div>
-          <span className="font-medium text-[#2c3e7e]">Standards:</span>
-          <p className="text-[#666666]">{observation.pre_observation_form.standards_addressed}</p>
-        </div>
-      )}
-      {observation.pre_observation_form.student_context && (
-        <div>
-          <span className="font-medium text-[#2c3e7e]">Student Context:</span>
-          <p className="text-[#666666]">{observation.pre_observation_form.student_context}</p>
-        </div>
-      )}
-      {observation.pre_observation_form.instructional_strategies && (
-        <div>
-          <span className="font-medium text-[#2c3e7e]">Instructional Strategies:</span>
-          <p className="text-[#666666]">{observation.pre_observation_form.instructional_strategies}</p>
-        </div>
-      )}
-      {observation.pre_observation_form.focus_areas && (
-        <div className="bg-yellow-50 border border-yellow-200 p-2 rounded">
-          <span className="font-medium text-[#f3843e]">🎯 Focus Areas Requested:</span>
-          <p className="text-[#666666]">{observation.pre_observation_form.focus_areas}</p>
-        </div>
-      )}
-    </div>
-  </div>
-)}
-        {/* Notes List */}
-        <div className="space-y-3">
-          {notes.length === 0 ? (
-            <div className="text-center py-12 text-[#666666]">
-              <div className="text-5xl mb-4">📝</div>
-              <p>No notes yet. Start typing below!</p>
-            </div>
-          ) : (
-            notes.map(note => (
-              <div
-                key={note.id}
-                className={`p-4 rounded-lg shadow-sm ${getNoteTypeStyle(note.note_type)}`}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs text-[#666666]">
-                    {getNoteTypeIcon(note.note_type)} {formatNoteTime(note.timestamp)}
-                  </span>
+      {/* Body: notes column (left) + rubric panel (right, desktop) */}
+      <div className="flex-1 flex min-h-0">
+        {/* ── Notes column ── */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <main className="flex-1 overflow-y-auto p-4">
+            <div className="max-w-4xl mx-auto">
+              {/* Pre-Observation Info (for formal observations) */}
+              {observation?.observation_type === 'formal' && observation?.pre_observation_form && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-semibold text-[#2c3e7e]">📋 Pre-Observation Form</h3>
+                    <button
+                      onClick={() => document.getElementById('pre-obs-details').classList.toggle('hidden')}
+                      className="text-sm text-[#477fc1] hover:underline"
+                    >
+                      Show/Hide Details
+                    </button>
+                  </div>
+                  <div id="pre-obs-details" className="space-y-3 text-sm">
+                    {observation.pre_observation_form.lesson_objective && (
+                      <div>
+                        <span className="font-medium text-[#2c3e7e]">Lesson Objective:</span>
+                        <p className="text-[#666666]">{observation.pre_observation_form.lesson_objective}</p>
+                      </div>
+                    )}
+                    {observation.pre_observation_form.standards_addressed && (
+                      <div>
+                        <span className="font-medium text-[#2c3e7e]">Standards:</span>
+                        <p className="text-[#666666]">{observation.pre_observation_form.standards_addressed}</p>
+                      </div>
+                    )}
+                    {observation.pre_observation_form.student_context && (
+                      <div>
+                        <span className="font-medium text-[#2c3e7e]">Student Context:</span>
+                        <p className="text-[#666666]">{observation.pre_observation_form.student_context}</p>
+                      </div>
+                    )}
+                    {observation.pre_observation_form.instructional_strategies && (
+                      <div>
+                        <span className="font-medium text-[#2c3e7e]">Instructional Strategies:</span>
+                        <p className="text-[#666666]">{observation.pre_observation_form.instructional_strategies}</p>
+                      </div>
+                    )}
+                    {observation.pre_observation_form.focus_areas && (
+                      <div className="bg-yellow-50 border border-yellow-200 p-2 rounded">
+                        <span className="font-medium text-[#f3843e]">🎯 Focus Areas Requested:</span>
+                        <p className="text-[#666666]">{observation.pre_observation_form.focus_areas}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="text-[#333] whitespace-pre-wrap">{note.note_text}</p>
-                {note.tags && note.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {note.tags.map(tag => (
-                      <span
-                        key={tag.id}
-                        className="text-xs bg-[#477fc1] text-white px-2 py-1 rounded"
-                        title={tag.standard?.name}
-                      >
-                        🏷️ {tag.standard?.code}
-                      </span>
+              )}
+
+              {/* Notes List */}
+              <div className="space-y-3">
+                {notes.length === 0 ? (
+                  <div className="text-center py-12 text-[#666666]">
+                    <div className="text-5xl mb-4">📝</div>
+                    <p>No notes yet. Start typing below!</p>
+                  </div>
+                ) : (
+                  notes.map(note => (
+                    <div
+                      key={note.id}
+                      className={`p-4 rounded-lg shadow-sm ${getNoteTypeStyle(note.note_type)}`}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-xs text-[#666666]">
+                          {getNoteTypeIcon(note.note_type)} {formatNoteTime(note.timestamp)}
+                        </span>
+                      </div>
+                      <p className="text-[#333] whitespace-pre-wrap">{note.note_text}</p>
+                      {note.tags && note.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {note.tags.map(tag => (
+                            <span
+                              key={tag.id}
+                              className="text-xs bg-[#477fc1] text-white px-2 py-1 rounded"
+                              title={tag.standard?.name}
+                            >
+                              🏷️ {tag.standard?.code}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+                <div ref={notesEndRef} />
+              </div>
+            </div>
+          </main>
+
+          {/* Note Input - bottom of notes column */}
+          {!isViewOnly && (
+            <div className="bg-white border-t shadow-lg shrink-0">
+              <div className="max-w-4xl mx-auto p-4">
+                {/* Note Type Selector */}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    onClick={() => setNoteType('general')}
+                    className={`px-3 py-1 rounded text-sm transition-colors ${
+                      noteType === 'general' ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    📝 General
+                  </button>
+                  <button
+                    onClick={() => setNoteType('strength')}
+                    className={`px-3 py-1 rounded text-sm transition-colors ${
+                      noteType === 'strength' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700'
+                    }`}
+                  >
+                    💪 Strength
+                  </button>
+                  <button
+                    onClick={() => setNoteType('growth_area')}
+                    className={`px-3 py-1 rounded text-sm transition-colors ${
+                      noteType === 'growth_area' ? 'bg-yellow-600 text-white' : 'bg-yellow-100 text-yellow-700'
+                    }`}
+                  >
+                    🌱 Growth
+                  </button>
+                  <button
+                    onClick={() => setNoteType('question')}
+                    className={`px-3 py-1 rounded text-sm transition-colors ${
+                      noteType === 'question' ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700'
+                    }`}
+                  >
+                    ❓ Question
+                  </button>
+                </div>
+
+                {/* Selected Standards (queued for the next note) */}
+                {selectedStandards.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {selectedStandards.map(stdId => {
+                      const std = standards.find(s => s.id === stdId)
+                      return (
+                        <span
+                          key={stdId}
+                          onClick={() => toggleStandard(stdId)}
+                          className="text-xs bg-[#477fc1] text-white px-2 py-1 rounded cursor-pointer hover:bg-[#3a6ca8]"
+                        >
+                          {std?.code} ✕
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Input Row */}
+                <div className="flex gap-2">
+                  {/* Tag button — mobile only (desktop uses the side panel) */}
+                  <button
+                    onClick={() => setShowStandardPicker(!showStandardPicker)}
+                    className={`lg:hidden px-3 py-2 rounded-lg border transition-colors ${
+                      showStandardPicker ? 'bg-[#2c3e7e] text-white' : 'bg-gray-100 text-[#666666] hover:bg-gray-200'
+                    }`}
+                    title="Tag to Standard"
+                  >
+                    🏷️
+                  </button>
+                  <textarea
+                    value={newNote}
+                    onChange={(e) => setNewNote(e.target.value)}
+                    placeholder="Type your observation note..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#477fc1] resize-none"
+                    rows="2"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        addNote()
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={addNote}
+                    disabled={saving || !newNote.trim()}
+                    className="px-4 py-2 bg-[#2c3e7e] text-white rounded-lg hover:bg-[#1e2a5e] disabled:opacity-50"
+                  >
+                    {saving ? '...' : 'Add'}
+                  </button>
+                </div>
+
+                {/* Standard Picker — mobile only */}
+                {showStandardPicker && (
+                  <div className="lg:hidden mt-3 max-h-48 overflow-y-auto border rounded-lg p-3 bg-gray-50">
+                    <p className="text-xs text-[#666666] mb-2">Click to tag this note to a standard:</p>
+                    {domains.map(domain => (
+                      <div key={domain.id} className="mb-3">
+                        <p className="text-xs font-semibold text-[#2c3e7e] mb-1">{domain.name}</p>
+                        <div className="flex flex-col gap-1">
+                          {getStandardsForDomain(domain.id).map(std => (
+                            <button
+                              key={std.id}
+                              onClick={() => toggleStandard(std.id)}
+                              className={`text-xs px-2 py-2 rounded transition-colors text-left ${
+                                selectedStandards.includes(std.id)
+                                  ? 'bg-[#477fc1] text-white'
+                                  : 'bg-white border border-gray-300 text-[#666666] hover:bg-gray-100'
+                              }`}
+                            >
+                              <span className="font-semibold">{std.code}</span> - {std.name}
+                              {coverageFor(std.id) > 0 && <span className="ml-1 text-green-600">✓{coverageFor(std.id)}</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
+
+                {/* Complete Button */}
+                <div className="mt-3 flex justify-end">
+                  <button
+                    onClick={() => setShowCompleteModal(true)}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  >
+                    ✓ Complete Observation
+                  </button>
+                </div>
               </div>
-            ))
+            </div>
           )}
-          <div ref={notesEndRef} />
-        </div>
-      </main>
 
-      {/* Note Input - Fixed at Bottom */}
-      {!isViewOnly && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-30">
-          <div className="max-w-4xl mx-auto p-4">
-            {/* Note Type Selector */}
-            <div className="flex gap-2 mb-3">
-              <button
-                onClick={() => setNoteType('general')}
-                className={`px-3 py-1 rounded text-sm transition-colors ${
-                  noteType === 'general' ? 'bg-gray-700 text-white' : 'bg-gray-200 text-gray-700'
-                }`}
-              >
-                📝 General
-              </button>
-              <button
-                onClick={() => setNoteType('strength')}
-                className={`px-3 py-1 rounded text-sm transition-colors ${
-                  noteType === 'strength' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700'
-                }`}
-              >
-                💪 Strength
-              </button>
-              <button
-                onClick={() => setNoteType('growth_area')}
-                className={`px-3 py-1 rounded text-sm transition-colors ${
-                  noteType === 'growth_area' ? 'bg-yellow-600 text-white' : 'bg-yellow-100 text-yellow-700'
-                }`}
-              >
-                🌱 Growth
-              </button>
-              <button
-                onClick={() => setNoteType('question')}
-                className={`px-3 py-1 rounded text-sm transition-colors ${
-                  noteType === 'question' ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-700'
-                }`}
-              >
-                ❓ Question
-              </button>
-            </div>
-
-            {/* Selected Standards */}
-            {selectedStandards.length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-2">
-                {selectedStandards.map(stdId => {
-                  const std = standards.find(s => s.id === stdId)
-                  return (
-                    <span
-                      key={stdId}
-                      onClick={() => toggleStandard(stdId)}
-                      className="text-xs bg-[#477fc1] text-white px-2 py-1 rounded cursor-pointer hover:bg-[#3a6ca8]"
-                    >
-                      {std?.code} ✕
-                    </span>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Input Row */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowStandardPicker(!showStandardPicker)}
-                className={`px-3 py-2 rounded-lg border transition-colors ${
-                  showStandardPicker ? 'bg-[#2c3e7e] text-white' : 'bg-gray-100 text-[#666666] hover:bg-gray-200'
-                }`}
-                title="Tag to Standard"
-              >
-                🏷️
-              </button>
-              <textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Type your observation note..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#477fc1] resize-none"
-                rows="2"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    addNote()
-                  }
-                }}
-              />
-              <button
-                onClick={addNote}
-                disabled={saving || !newNote.trim()}
-                className="px-4 py-2 bg-[#2c3e7e] text-white rounded-lg hover:bg-[#1e2a5e] disabled:opacity-50"
-              >
-                {saving ? '...' : 'Add'}
-              </button>
-            </div>
-
-            {/* Standard Picker */}
-{showStandardPicker && (
-  <div className="mt-3 max-h-48 overflow-y-auto border rounded-lg p-3 bg-gray-50">
-    <p className="text-xs text-[#666666] mb-2">Click to tag this note to a standard:</p>
-    {domains.map(domain => (
-      <div key={domain.id} className="mb-3">
-        <p className="text-xs font-semibold text-[#2c3e7e] mb-1">{domain.name}</p>
-        <div className="flex flex-col gap-1">
-          {getStandardsForDomain(domain.id).map(std => (
-            <button
-              key={std.id}
-              onClick={() => toggleStandard(std.id)}
-              className={`text-xs px-2 py-2 rounded transition-colors text-left ${
-                selectedStandards.includes(std.id)
-                  ? 'bg-[#477fc1] text-white'
-                  : 'bg-white border border-gray-300 text-[#666666] hover:bg-gray-100'
-              }`}
-            >
-              <span className="font-semibold">{std.code}</span> - {std.name}
-            </button>
-          ))}
-        </div>
-      </div>
-    ))}
-  </div>
-)}
-
-            {/* Complete Button */}
-            <div className="mt-3 flex justify-end">
-              <button
-                onClick={() => setShowCompleteModal(true)}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                ✓ Complete Observation
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* View Mode - Feedback Display */}
-      {isViewOnly && observation && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-30">
-          <div className="max-w-4xl mx-auto p-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              {observation.feedback && (
-                <div>
-                  <h4 className="text-sm font-semibold text-[#2c3e7e] mb-1">Feedback</h4>
-                  <p className="text-sm text-[#666666] bg-gray-50 p-3 rounded">{observation.feedback}</p>
-                </div>
-              )}
-              {observation.next_steps && (
-                <div>
-                  <h4 className="text-sm font-semibold text-[#2c3e7e] mb-1">Next Steps</h4>
-                  <p className="text-sm text-[#666666] bg-gray-50 p-3 rounded">{observation.next_steps}</p>
-                </div>
-              )}
-            </div>
-            <div className="mt-4 text-center">
-              <span className="text-sm text-green-600">✓ Observation completed</span>
-              {observation.ended_at && (
-                <span className="text-sm text-[#666666] ml-2">
-                  • Duration: {formatTime(
-                    Math.floor((new Date(observation.ended_at) - new Date(observation.started_at)) / 1000)
+          {/* View Mode - Feedback Display */}
+          {isViewOnly && observation && (
+            <div className="bg-white border-t shadow-lg shrink-0">
+              <div className="max-w-4xl mx-auto p-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  {observation.feedback && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-[#2c3e7e] mb-1">Feedback</h4>
+                      <p className="text-sm text-[#666666] bg-gray-50 p-3 rounded">{observation.feedback}</p>
+                    </div>
                   )}
-                </span>
-              )}
+                  {observation.next_steps && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-[#2c3e7e] mb-1">Next Steps</h4>
+                      <p className="text-sm text-[#666666] bg-gray-50 p-3 rounded">{observation.next_steps}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-4 text-center">
+                  <span className="text-sm text-green-600">✓ Observation completed</span>
+                  {observation.ended_at && observation.started_at && (
+                    <span className="text-sm text-[#666666] ml-2">
+                      • Duration: {formatTime(
+                        Math.floor((new Date(observation.ended_at) - new Date(observation.started_at)) / 1000)
+                      )}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+
+        {/* ── Rubric panel (desktop only) ── */}
+        <aside className="hidden lg:flex lg:flex-col w-80 border-l border-gray-200 bg-white shrink-0">
+          <div className="p-4 border-b border-gray-100 shrink-0">
+            <h3 className="font-semibold text-[#2c3e7e]">Rubric Coverage</h3>
+            <p className="text-xs text-[#666666]">Indicators tagged this observation</p>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <RubricPanel />
+          </div>
+        </aside>
+      </div>
 
       {/* Complete Observation Modal */}
       {showCompleteModal && (
@@ -600,7 +686,7 @@ function ObservationSession() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
             <div className="p-6">
               <h3 className="text-xl font-bold text-[#2c3e7e] mb-4">Complete Observation</h3>
-              
+
               <div className="mb-4 p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm text-[#666666]">
                   <strong>Staff:</strong> {observation?.staff?.full_name}
