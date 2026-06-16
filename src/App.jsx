@@ -20,6 +20,8 @@ import MySummative from './pages/MySummative'
 import Reports from './pages/Reports'
 import StaffImport from './pages/StaffImport'
 import AuthCallback from './pages/AuthCallback'
+import MyChecklist from './pages/MyChecklist'
+import Checklists from './pages/Checklists'
 import LeaveTracker from './pages/LeaveTracker'
 import ODEStaffPosition from './pages/ODEStaffPosition'
 
@@ -49,6 +51,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <Goals />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* My Checklist - all authenticated users (their own cycle) */}
+          <Route 
+            path="/my-checklist" 
+            element={
+              <ProtectedRoute>
+                <MyChecklist />
               </ProtectedRoute>
             } 
           />
@@ -189,6 +201,16 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <SummativeEvaluation />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Evaluation Checklists - Admin + Evaluators + HR */}
+          <Route 
+            path="/checklists" 
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'hr']} allowEvaluators>
+                <Checklists />
               </ProtectedRoute>
             } 
           />

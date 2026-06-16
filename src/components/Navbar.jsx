@@ -87,6 +87,7 @@ export default function Navbar() {
 
   // My Evaluation group (staff + evaluators can see their own)
   const myEvalLinks = [
+    { to: '/my-checklist', label: 'My Checklist', icon: '🗒️' },
     { to: '/goals', label: 'My Goals', icon: '🎯' },
     { to: '/self-reflection', label: 'Self-Reflection', icon: '🔍' },
     { to: '/my-observations', label: 'My Observations', icon: '👁' },
@@ -96,6 +97,7 @@ export default function Navbar() {
 
   // Evaluations group (admin/evaluator only)
   const evaluationLinks = [
+    { to: '/checklists', label: 'Checklists', icon: '🗒️' },
     { to: '/observations', label: 'Observations', icon: '👁' },
     { to: '/meetings', label: 'Meetings', icon: '🗓' },
     { to: '/summatives', label: 'Summatives', icon: '📄' },
