@@ -91,6 +91,7 @@ export default function Navbar() {
     { to: '/goals', label: 'My Goals', icon: '🎯' },
     { to: '/self-reflection', label: 'Self-Reflection', icon: '🔍' },
     { to: '/my-observations', label: 'My Observations', icon: '👁' },
+    { to: '/my-evidence', label: 'My Evidence', icon: '🗂️' },
     { to: '/my-meetings', label: 'My Meetings', icon: '🗓' },
     { to: '/my-summative', label: 'My Summative Evaluation', icon: '📄' },
   ]
@@ -99,6 +100,7 @@ export default function Navbar() {
   const evaluationLinks = [
     { to: '/checklists', label: 'Checklists', icon: '🗒️' },
     { to: '/observations', label: 'Observations', icon: '👁' },
+    { to: '/evidence', label: 'Body of Evidence', icon: '🗂️' },
     { to: '/meetings', label: 'Meetings', icon: '🗓' },
     { to: '/summatives', label: 'Summatives', icon: '📄' },
     { to: '/goal-approvals', label: 'Goal Approvals', icon: '✅' },

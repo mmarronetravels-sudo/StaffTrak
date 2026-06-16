@@ -23,6 +23,8 @@ import AuthCallback from './pages/AuthCallback'
 import MyChecklist from './pages/MyChecklist'
 import Checklists from './pages/Checklists'
 import Calendar from './pages/Calendar'
+import MyEvidence from './pages/MyEvidence'
+import Evidence from './pages/Evidence'
 import LeaveTracker from './pages/LeaveTracker'
 import ODEStaffPosition from './pages/ODEStaffPosition'
 
@@ -87,13 +89,23 @@ function App() {
           />
 
           {/* My Observations - staff view */}
-          <Route 
-            path="/my-observations" 
+          <Route
+            path="/my-observations"
             element={
               <ProtectedRoute>
                 <MyObservations />
               </ProtectedRoute>
-            } 
+            }
+          />
+
+          {/* My Evidence - all authenticated users (their own body of evidence) */}
+          <Route
+            path="/my-evidence"
+            element={
+              <ProtectedRoute>
+                <MyEvidence />
+              </ProtectedRoute>
+            }
           />
 
           {/* My Meetings - staff view */}
@@ -217,13 +229,23 @@ function App() {
           />
 
           {/* Evaluation Checklists - Admin + Evaluators + HR */}
-          <Route 
-            path="/checklists" 
+          <Route
+            path="/checklists"
             element={
               <ProtectedRoute allowedRoles={['district_admin', 'hr']} allowEvaluators>
                 <Checklists />
               </ProtectedRoute>
-            } 
+            }
+          />
+
+          {/* Body of Evidence - Admin + Evaluators + HR */}
+          <Route
+            path="/evidence"
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'hr']} allowEvaluators>
+                <Evidence />
+              </ProtectedRoute>
+            }
           />
 
           {/* Reports - Admin + Evaluators + HR */}
