@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { obsTypeLabel } from '../lib/observationTypes'
 
 function ObservationSession() {
   const { id } = useParams()
@@ -557,8 +558,13 @@ function ObservationSession() {
               <span className={`text-xs px-2 py-1 rounded ${
                 observation?.observation_type === 'formal' ? 'bg-white text-[#2c3e7e]' : 'bg-[#477fc1]'
               }`}>
-                {observation?.observation_type}
+                {obsTypeLabel(observation?.observation_type)}
               </span>
+              {observation?.is_formative_only && (
+                <span className="text-xs px-2 py-1 rounded bg-sky-200 text-sky-800" title="Formative only — not counted toward the summative score">
+                  Formative
+                </span>
+              )}
             </div>
             <p className="text-sm text-gray-300">
               {observation?.staff?.position_type} • {observation?.subject_topic || 'Observation'}

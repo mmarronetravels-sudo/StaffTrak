@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { notifyEvaluationReady } from '../services/emailService'
 import { SummativePDFDownload } from '../components/SummativePDF'
 import Navbar from '../components/Navbar'
+import { obsTypeLabel } from '../lib/observationTypes'
 
 function SummativeEvaluation() {
   const { staffId } = useParams()
@@ -163,7 +164,7 @@ function SummativeEvaluation() {
     // Fetch observations
     const { data: obsData } = await supabase
       .from('observations')
-      .select('id, observation_type, scheduled_at')
+      .select('id, observation_type, is_formative_only, scheduled_at')
       .eq('staff_id', staffId)
       .eq('status', 'completed')
       .order('scheduled_at')
@@ -453,14 +454,24 @@ function SummativeEvaluation() {
             <div className="bg-white rounded-lg shadow">
               <div className="p-4 border-b border-gray-100">
                 <h3 className="font-semibold text-[#2c3e7e]">👁️ Observations ({observations.length})</h3>
+                <p className="text-xs text-[#666666]">
+                  {observations.filter(o => !o.is_formative_only).length} scored · {observations.filter(o => o.is_formative_only).length} formative
+                </p>
               </div>
               <div className="p-4">
                 {observations.length > 0 ? (
                   <div className="space-y-2">
                     {observations.map(obs => (
-                      <div key={obs.id} className="flex justify-between text-sm">
-                        <span className="capitalize">{obs.observation_type}</span>
-                        <span className="text-[#666666]">{formatDate(obs.scheduled_at)}</span>
+                      <div key={obs.id} className="flex justify-between items-center text-sm gap-2">
+                        <span className="flex items-center gap-1.5">
+                          {obsTypeLabel(obs.observation_type)}
+                          {obs.is_formative_only && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200" title="Formative only — not counted toward the summative score">
+                              not scored
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-[#666666] shrink-0">{formatDate(obs.scheduled_at)}</span>
                       </div>
                     ))}
                   </div>

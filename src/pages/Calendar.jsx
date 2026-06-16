@@ -3,15 +3,21 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { notifyObservationScheduled } from '../services/emailService'
 import Navbar from '../components/Navbar'
+import {
+  OBSERVATION_TYPES,
+  OBSERVATION_TYPE_ORDER,
+  obsTypeLabel,
+  obsTypeDot,
+  formativeOnlyDefault,
+} from '../lib/observationTypes'
 
-// ── Colors per event type ───────────────────────────────────────
-const EVENT_STYLE = {
-  formal:        { dot: '#2c3e7e', label: 'Formal Obs' },
-  informal:      { dot: '#477fc1', label: 'Informal Obs' },
-  walkthrough:   { dot: '#5fa8d3', label: 'Walk-through' },
-  learning_walk: { dot: '#5fa8d3', label: 'Learning Walk' },
-  meeting:       { dot: '#f3843e', label: 'Meeting' },
-}
+// ── Colors + labels per event type (observations from the shared module,
+//    plus the meeting event) ─────────────────────────────────────
+const dotFor = (type) => (type === 'meeting' ? '#f3843e' : obsTypeDot(type))
+const labelFor = (type) => (type === 'meeting' ? 'Meeting' : obsTypeLabel(type))
+
+// Legend: the observation types + meeting.
+const LEGEND_TYPES = [...OBSERVATION_TYPE_ORDER, 'meeting']
 
 const MEETING_LABELS = {
   initial_goals: 'Initial Goals Meeting',
@@ -53,8 +59,13 @@ export default function Calendar() {
   const [showSchedule, setShowSchedule] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
-    staff_id: '', observation_type: 'informal', scheduled_at: '', location: '', subject_topic: '',
+    staff_id: '', observation_type: 'informal', is_formative_only: false,
+    scheduled_at: '', location: '', subject_topic: '',
   })
+
+  // Changing the type resets the formative flag to that type's default.
+  const setType = (observation_type) =>
+    setForm((f) => ({ ...f, observation_type, is_formative_only: formativeOnlyDefault(observation_type) }))
 
   useEffect(() => {
     if (profile?.id) load()
@@ -67,7 +78,7 @@ export default function Calendar() {
     // Evaluators/admins see what they run; staff see their own.
     const obsQuery = supabase
       .from('observations')
-      .select('id, observation_type, scheduled_at, status, location, subject_topic, staff:staff_id(full_name), observer:observer_id(full_name)')
+      .select('id, observation_type, is_formative_only, scheduled_at, status, location, subject_topic, staff:staff_id(full_name), observer:observer_id(full_name)')
     const meetQuery = supabase
       .from('meetings')
       .select('id, meeting_type, scheduled_at, status, completed_at, staff:staff_id(full_name), evaluator:evaluator_id(full_name)')
@@ -87,6 +98,7 @@ export default function Calendar() {
         id: `obs-${o.id}`,
         kind: 'observation',
         type: o.observation_type,
+        formativeOnly: o.is_formative_only,
         date: new Date(o.scheduled_at),
         person: canSchedule ? o.staff?.full_name : o.observer?.full_name,
         status: o.status,
@@ -124,7 +136,7 @@ export default function Calendar() {
   const openSchedule = (day) => {
     if (!canSchedule) return
     setForm({
-      staff_id: '', observation_type: 'informal',
+      staff_id: '', observation_type: 'informal', is_formative_only: formativeOnlyDefault('informal'),
       scheduled_at: `${ymd(day)}T09:00`,
       location: '', subject_topic: '',
     })
@@ -141,17 +153,19 @@ export default function Calendar() {
         observer_id: profile.id,
         staff_id: form.staff_id,
         observation_type: form.observation_type,
+        is_formative_only: form.is_formative_only,
         scheduled_at: form.scheduled_at,
         location: form.location,
         subject_topic: form.subject_topic,
         status: 'scheduled',
       }])
-      .select('id, observation_type, scheduled_at, status, location, subject_topic, staff:staff_id(full_name, email), observer:observer_id(full_name)')
+      .select('id, observation_type, is_formative_only, scheduled_at, status, location, subject_topic, staff:staff_id(full_name, email), observer:observer_id(full_name)')
 
     if (!error && data) {
       const o = data[0]
       setEvents(prev => [...prev, {
         id: `obs-${o.id}`, kind: 'observation', type: o.observation_type,
+        formativeOnly: o.is_formative_only,
         date: new Date(o.scheduled_at), person: o.staff?.full_name,
         status: o.status, detail: o.subject_topic || o.location || '',
       }].sort((a, b) => a.date - b.date))
@@ -165,7 +179,7 @@ export default function Calendar() {
             staffName: o.staff.full_name,
             observerName: o.observer?.full_name,
             date: new Date(o.scheduled_at).toLocaleDateString(),
-            type: o.observation_type === 'formal' ? 'Formal' : 'Informal',
+            type: obsTypeLabel(o.observation_type),
           })
         } catch { /* ignore */ }
       }
@@ -194,10 +208,10 @@ export default function Calendar() {
           </div>
           {/* Legend */}
           <div className="flex flex-wrap gap-3 text-xs text-[#666666]">
-            {['formal','informal','meeting'].map(k => (
+            {LEGEND_TYPES.map(k => (
               <span key={k} className="flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: EVENT_STYLE[k].dot }} />
-                {EVENT_STYLE[k].label}
+                <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: dotFor(k) }} />
+                {labelFor(k)}
               </span>
             ))}
           </div>
@@ -246,8 +260,8 @@ export default function Calendar() {
                       <div className="space-y-1">
                         {dayEvents.slice(0, 3).map(e => (
                           <div key={e.id} className="flex items-center gap-1 text-[11px] truncate">
-                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: EVENT_STYLE[e.type]?.dot || '#999' }} />
-                            <span className="truncate text-gray-700">{e.person || EVENT_STYLE[e.type]?.label}</span>
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dotFor(e.type) }} />
+                            <span className="truncate text-gray-700">{e.person || labelFor(e.type)}</span>
                           </div>
                         ))}
                         {dayEvents.length > 3 && (
@@ -268,7 +282,7 @@ export default function Calendar() {
               <div className="bg-white rounded-lg shadow divide-y divide-gray-100">
                 {upcoming.map(e => (
                   <div key={e.id} className="flex items-center gap-3 p-4">
-                    <span className="w-3 h-3 rounded-full shrink-0" style={{ background: EVENT_STYLE[e.type]?.dot || '#999' }} />
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ background: dotFor(e.type) }} />
                     <div className="w-28 shrink-0 text-sm text-[#2c3e7e] font-medium">
                       {e.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       <span className="block text-xs text-[#666666] font-normal">
@@ -277,8 +291,11 @@ export default function Calendar() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-800 truncate">
-                        <span className="font-medium">{e.kind === 'meeting' ? (MEETING_LABELS[e.subtype] || 'Meeting') : (EVENT_STYLE[e.type]?.label || 'Observation')}</span>
+                        <span className="font-medium">{e.kind === 'meeting' ? (MEETING_LABELS[e.subtype] || 'Meeting') : labelFor(e.type)}</span>
                         {e.person && <span className="text-[#666666]"> · {e.person}</span>}
+                        {e.kind === 'observation' && e.formativeOnly && (
+                          <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 align-middle">Formative</span>
+                        )}
                       </p>
                       {e.detail && <p className="text-xs text-[#666666] truncate">{e.detail}</p>}
                     </div>
@@ -326,12 +343,25 @@ export default function Calendar() {
                   <label className="block text-sm font-medium text-[#666666] mb-1">Type *</label>
                   <select
                     value={form.observation_type}
-                    onChange={(e) => setForm({ ...form, observation_type: e.target.value })}
+                    onChange={(e) => setType(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
                   >
-                    <option value="informal">Informal</option>
-                    <option value="formal">Formal</option>
+                    {OBSERVATION_TYPE_ORDER.map(t => (
+                      <option key={t} value={t}>{OBSERVATION_TYPES[t].label}</option>
+                    ))}
                   </select>
+                  <p className="text-xs text-[#666666] mt-1">{OBSERVATION_TYPES[form.observation_type]?.blurb}</p>
+                  <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.is_formative_only}
+                      onChange={(e) => setForm({ ...form, is_formative_only: e.target.checked })}
+                      className="rounded text-[#477fc1]"
+                    />
+                    <span className="text-sm text-[#666666]">
+                      Formative only <span className="text-gray-400">— evidence for growth, not counted in the summative score</span>
+                    </span>
+                  </label>
                 </div>
 
                 <div>

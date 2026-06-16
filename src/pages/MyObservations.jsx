@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
+import { obsTypeLabel } from '../lib/observationTypes'
 
 function MyObservations() {
   const { profile, signOut } = useAuth()
@@ -186,9 +187,12 @@ function MyObservations() {
                       <div className="flex justify-between items-start">
                         <div>
                           <div className="flex items-center gap-3 mb-2">
-                            <span className={`text-xs px-2 py-1 rounded ${obs.observation_type === 'formal' ? 'bg-[#2c3e7e] text-white' : 'bg-[#477fc1] text-white'}`}>
-                              {obs.observation_type}
+                            <span className={`text-xs px-2 py-1 rounded ${obs.observation_type === 'formal' ? 'bg-[#2c3e7e] text-white' : obs.observation_type === 'informal' ? 'bg-[#477fc1] text-white' : 'bg-sky-100 text-sky-700'}`}>
+                              {obsTypeLabel(obs.observation_type)}
                             </span>
+                            {obs.is_formative_only && (
+                              <span className="text-xs px-2 py-1 rounded bg-sky-50 text-sky-700 border border-sky-200">Formative only</span>
+                            )}
                             <span className={`text-xs px-2 py-1 rounded ${getStatusBadge(obs).class}`}>
                               {getStatusBadge(obs).text}
                             </span>
@@ -235,9 +239,12 @@ function MyObservations() {
                       <div className="flex justify-between items-start">
                         <div>
                           <div className="flex items-center gap-3 mb-2">
-                            <span className={`text-xs px-2 py-1 rounded ${obs.observation_type === 'formal' ? 'bg-[#2c3e7e] text-white' : 'bg-[#477fc1] text-white'}`}>
-                              {obs.observation_type}
+                            <span className={`text-xs px-2 py-1 rounded ${obs.observation_type === 'formal' ? 'bg-[#2c3e7e] text-white' : obs.observation_type === 'informal' ? 'bg-[#477fc1] text-white' : 'bg-sky-100 text-sky-700'}`}>
+                              {obsTypeLabel(obs.observation_type)}
                             </span>
+                            {obs.is_formative_only && (
+                              <span className="text-xs px-2 py-1 rounded bg-sky-50 text-sky-700 border border-sky-200">Formative only</span>
+                            )}
                             <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-800">Completed</span>
                           </div>
                           <p className="text-[#666666]">Observer: <span className="font-medium text-[#2c3e7e]">{obs.observer?.full_name}</span></p>

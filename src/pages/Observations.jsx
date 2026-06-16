@@ -4,6 +4,12 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { notifyObservationScheduled } from '../services/emailService'
 import Navbar from '../components/Navbar'
+import {
+  OBSERVATION_TYPES,
+  OBSERVATION_TYPE_ORDER,
+  obsTypeLabel,
+  formativeOnlyDefault,
+} from '../lib/observationTypes'
 
 function Observations() {
   const { profile, signOut } = useAuth()
@@ -16,10 +22,15 @@ function Observations() {
   const [newObservation, setNewObservation] = useState({
     staff_id: '',
     observation_type: 'informal',
+    is_formative_only: false,
     scheduled_at: '',
     location: '',
     subject_topic: ''
   })
+
+  // Changing the type resets the formative flag to that type's default.
+  const setObsType = (observation_type) =>
+    setNewObservation(o => ({ ...o, observation_type, is_formative_only: formativeOnlyDefault(observation_type) }))
 
   useEffect(() => {
     if (profile) {
@@ -70,6 +81,7 @@ function Observations() {
         observer_id: profile.id,
         staff_id: newObservation.staff_id,
         observation_type: newObservation.observation_type,
+        is_formative_only: newObservation.is_formative_only,
         scheduled_at: newObservation.scheduled_at,
         location: newObservation.location,
         subject_topic: newObservation.subject_topic,
@@ -88,6 +100,7 @@ function Observations() {
       setNewObservation({
         staff_id: '',
         observation_type: 'informal',
+        is_formative_only: false,
         scheduled_at: '',
         location: '',
         subject_topic: ''
@@ -102,7 +115,7 @@ function Observations() {
           evaluatorName: profile.full_name,
           date: obsDate.toLocaleDateString(),
           time: obsDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          type: obs.observation_type === 'formal' ? 'Formal' : 'Informal'
+          type: obsTypeLabel(obs.observation_type)
         })
       }
     }
@@ -139,9 +152,9 @@ function Observations() {
   }
 
   const getTypeBadge = (type) => {
-    return type === 'formal' 
-      ? 'bg-[#2c3e7e] text-white' 
-      : 'bg-[#477fc1] text-white'
+    if (type === 'formal') return 'bg-[#2c3e7e] text-white'
+    if (type === 'informal') return 'bg-[#477fc1] text-white'
+    return 'bg-sky-100 text-sky-700' // lightweight/formative types
   }
 
   const formatDate = (dateString) => {
@@ -293,8 +306,11 @@ function Observations() {
                         {observation.staff?.full_name || 'Unknown Staff'}
                       </h3>
                       <span className={`text-xs px-2 py-1 rounded ${getTypeBadge(observation.observation_type)}`}>
-                        {observation.observation_type}
+                        {obsTypeLabel(observation.observation_type)}
                       </span>
+                      {observation.is_formative_only && (
+                        <span className="text-xs px-2 py-1 rounded bg-sky-50 text-sky-700 border border-sky-200">Formative only</span>
+                      )}
                       <span className={`text-xs px-2 py-1 rounded capitalize ${getStatusBadge(observation.status)}`}>
                         {observation.status?.replace('_', ' ')}
                       </span>
@@ -394,35 +410,29 @@ function Observations() {
                     <label className="block text-sm font-medium text-[#666666] mb-1">
                       Observation Type *
                     </label>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="observation_type"
-                          value="informal"
-                          checked={newObservation.observation_type === 'informal'}
-                          onChange={(e) => setNewObservation({...newObservation, observation_type: e.target.value})}
-                          className="text-[#477fc1]"
-                        />
-                        <span className="text-[#666666]">Informal</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="observation_type"
-                          value="formal"
-                          checked={newObservation.observation_type === 'formal'}
-                          onChange={(e) => setNewObservation({...newObservation, observation_type: e.target.value})}
-                          className="text-[#2c3e7e]"
-                        />
-                        <span className="text-[#666666]">Formal</span>
-                      </label>
-                    </div>
+                    <select
+                      value={newObservation.observation_type}
+                      onChange={(e) => setObsType(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
+                    >
+                      {OBSERVATION_TYPE_ORDER.map(t => (
+                        <option key={t} value={t}>{OBSERVATION_TYPES[t].label}</option>
+                      ))}
+                    </select>
                     <p className="text-xs text-[#666666] mt-1">
-                      {newObservation.observation_type === 'formal' 
-                        ? 'Formal observations include pre-observation and post-observation forms.'
-                        : 'Informal observations are shorter drop-in visits.'}
+                      {OBSERVATION_TYPES[newObservation.observation_type]?.blurb}
                     </p>
+                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newObservation.is_formative_only}
+                        onChange={(e) => setNewObservation({...newObservation, is_formative_only: e.target.checked})}
+                        className="rounded text-[#477fc1]"
+                      />
+                      <span className="text-sm text-[#666666]">
+                        Formative only <span className="text-gray-400">— evidence for growth, not counted in the summative score</span>
+                      </span>
+                    </label>
                   </div>
 
                   <div>
