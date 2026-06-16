@@ -22,6 +22,11 @@ function ObservationSession() {
   const [selectedStandards, setSelectedStandards] = useState([])
   const [showStandardPicker, setShowStandardPicker] = useState(false)
 
+  // Edit/delete state
+  const [editingId, setEditingId] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [editType, setEditType] = useState('general')
+
   // Completion state
   const [showCompleteModal, setShowCompleteModal] = useState(false)
   const [feedback, setFeedback] = useState('')
@@ -216,6 +221,56 @@ function ObservationSession() {
     setSaving(false)
   }
 
+  const startEdit = (note) => {
+    setEditingId(note.id)
+    setEditText(note.note_text)
+    setEditType(note.note_type || 'general')
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditText('')
+  }
+
+  const saveEdit = async (note) => {
+    if (!editText.trim()) return
+    setSaving(true)
+    const { error } = await supabase
+      .from('observation_notes')
+      .update({ note_text: editText.trim(), note_type: editType })
+      .eq('id', note.id)
+    if (!error) {
+      setNotes(notes.map(n => n.id === note.id ? { ...n, note_text: editText.trim(), note_type: editType } : n))
+      setEditingId(null)
+    } else {
+      alert(`Could not save note: ${error.message}`)
+    }
+    setSaving(false)
+  }
+
+  const deleteNote = async (note) => {
+    if (!window.confirm('Delete this note? This cannot be undone.')) return
+    setSaving(true)
+    // Remove tags first in case there's no cascade.
+    await supabase.from('observation_note_tags').delete().eq('note_id', note.id)
+    const { error } = await supabase.from('observation_notes').delete().eq('id', note.id)
+    if (!error) {
+      setNotes(notes.filter(n => n.id !== note.id))
+    } else {
+      alert(`Could not delete note: ${error.message}`)
+    }
+    setSaving(false)
+  }
+
+  const removeTag = async (note, tag) => {
+    const { error } = await supabase.from('observation_note_tags').delete().eq('id', tag.id)
+    if (!error) {
+      setNotes(notes.map(n => n.id === note.id ? { ...n, tags: (n.tags || []).filter(t => t.id !== tag.id) } : n))
+    } else {
+      alert(`Could not remove tag: ${error.message}`)
+    }
+  }
+
   const toggleStandard = (standardId) => {
     if (selectedStandards.includes(standardId)) {
       setSelectedStandards(selectedStandards.filter(id => id !== standardId))
@@ -318,6 +373,13 @@ function ObservationSession() {
   }
 
   const isViewOnly = observation?.status === 'completed'
+  const canEdit = !isViewOnly && observation?.observer_id === profile.id
+  const NOTE_TYPES = [
+    ['general', '📝 General'],
+    ['strength', '💪 Strength'],
+    ['growth_area', '🌱 Growth'],
+    ['question', '❓ Question'],
+  ]
 
   // ── Reusable rubric panel (right side on desktop) ──
   const RubricPanel = () => (
@@ -470,7 +532,9 @@ function ObservationSession() {
                     <p>No notes yet. Start typing below!</p>
                   </div>
                 ) : (
-                  notes.map(note => (
+                  notes.map(note => {
+                    const editing = editingId === note.id
+                    return (
                     <div
                       key={note.id}
                       className={`p-4 rounded-lg shadow-sm ${getNoteTypeStyle(note.note_type)}`}
@@ -479,23 +543,75 @@ function ObservationSession() {
                         <span className="text-xs text-[#666666]">
                           {getNoteTypeIcon(note.note_type)} {formatNoteTime(note.timestamp)}
                         </span>
+                        {canEdit && !editing && (
+                          <div className="flex gap-3">
+                            <button onClick={() => startEdit(note)} className="text-xs text-[#477fc1] hover:underline">Edit</button>
+                            <button onClick={() => deleteNote(note)} className="text-xs text-red-600 hover:underline">Delete</button>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-[#333] whitespace-pre-wrap">{note.note_text}</p>
+
+                      {editing ? (
+                        <div>
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {NOTE_TYPES.map(([val, label]) => (
+                              <button
+                                key={val}
+                                onClick={() => setEditType(val)}
+                                className={`px-2 py-1 rounded text-xs transition-colors ${
+                                  editType === val ? 'bg-[#2c3e7e] text-white' : 'bg-gray-200 text-gray-700'
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                          <textarea
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            rows="3"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#477fc1] resize-none"
+                          />
+                          <div className="flex gap-2 mt-2">
+                            <button onClick={cancelEdit} className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-[#666666] hover:bg-gray-50">Cancel</button>
+                            <button
+                              onClick={() => saveEdit(note)}
+                              disabled={saving || !editText.trim()}
+                              className="px-3 py-1.5 rounded-lg bg-[#2c3e7e] text-white text-sm hover:bg-[#1e2a5e] disabled:opacity-50"
+                            >
+                              {saving ? 'Saving…' : 'Save'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[#333] whitespace-pre-wrap">{note.note_text}</p>
+                      )}
+
                       {note.tags && note.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {note.tags.map(tag => (
                             <span
                               key={tag.id}
-                              className="text-xs bg-[#477fc1] text-white px-2 py-1 rounded"
+                              className="text-xs bg-[#477fc1] text-white px-2 py-1 rounded flex items-center gap-1"
                               title={tag.standard?.name}
                             >
                               🏷️ {tag.standard?.code}
+                              {canEdit && (
+                                <button
+                                  onClick={() => removeTag(note, tag)}
+                                  className="hover:text-red-200"
+                                  title="Remove tag"
+                                >
+                                  ✕
+                                </button>
+                              )}
                             </span>
                           ))}
                         </div>
                       )}
                     </div>
-                  ))
+                    )
+                  })
                 )}
                 <div ref={notesEndRef} />
               </div>
