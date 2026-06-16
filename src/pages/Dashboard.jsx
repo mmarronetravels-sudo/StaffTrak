@@ -620,7 +620,10 @@ function Dashboard() {
           </div>
         ) : (
           /* Staff Quick Actions */
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <a href="/my-checklist" className="bg-[#f3843e] text-white p-4 rounded-lg hover:bg-[#d9702f] text-center">
+              ✅ My Checklist
+            </a>
             <a href="/self-reflection" className="bg-[#2c3e7e] text-white p-4 rounded-lg hover:bg-[#1e2a5e] text-center">
               📝 Self-Reflection
             </a>
@@ -630,8 +633,8 @@ function Dashboard() {
             <a href="/my-observations" className="bg-[#477fc1] text-white p-4 rounded-lg hover:bg-[#3a6ca8] text-center">
               👁️ My Observations
             </a>
-            <a href="/my-summative" className="bg-[#f3843e] text-white p-4 rounded-lg hover:bg-[#d9702f] text-center">
-              📋 My Evaluation
+            <a href="/my-summative" className="bg-[#477fc1] text-white p-4 rounded-lg hover:bg-[#3a6ca8] text-center">
+              📋 My Summative Evaluation
             </a>
           </div>
         )}

@@ -92,7 +92,7 @@ export default function Navbar() {
     { to: '/self-reflection', label: 'Self-Reflection', icon: '🔍' },
     { to: '/my-observations', label: 'My Observations', icon: '👁' },
     { to: '/my-meetings', label: 'My Meetings', icon: '🗓' },
-    { to: '/my-summative', label: 'My Evaluation', icon: '📄' },
+    { to: '/my-summative', label: 'My Summative Evaluation', icon: '📄' },
   ]
 
   // Evaluations group (admin/evaluator only)
