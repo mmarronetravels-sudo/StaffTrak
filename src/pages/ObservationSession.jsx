@@ -13,6 +13,7 @@ function ObservationSession() {
   const [notes, setNotes] = useState([])
   const [standards, setStandards] = useState([])
   const [domains, setDomains] = useState([])
+  const [ratings, setRatings] = useState({}) // standard_id -> { id, rating }
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -111,6 +112,18 @@ function ObservationSession() {
 
     if (notesData) {
       setNotes(notesData)
+    }
+
+    // Fetch per-indicator ratings for this observation
+    const { data: ratingData } = await supabase
+      .from('observation_indicator_ratings')
+      .select('id, standard_id, rating')
+      .eq('observation_id', id)
+
+    if (ratingData) {
+      const map = {}
+      ratingData.forEach((r) => { map[r.standard_id] = { id: r.id, rating: r.rating } })
+      setRatings(map)
     }
 
     // Fetch rubric standards based on staff type
@@ -294,6 +307,53 @@ function ObservationSession() {
     return { covered, total: stds.length }
   }
 
+  // ── Per-indicator ratings (1-4, same scale as the summative) ──
+  // Click the current rating again to clear it; otherwise upsert.
+  const setRating = async (standardId, value) => {
+    const existing = ratings[standardId]
+    const clearing = existing?.rating === value
+
+    if (clearing) {
+      // optimistic clear
+      setRatings(prev => {
+        const next = { ...prev }
+        delete next[standardId]
+        return next
+      })
+      if (existing?.id) {
+        const { error } = await supabase
+          .from('observation_indicator_ratings')
+          .delete()
+          .eq('id', existing.id)
+        if (error) {
+          alert(`Could not clear rating: ${error.message}`)
+          fetchObservation()
+        }
+      }
+      return
+    }
+
+    // optimistic set
+    setRatings(prev => ({ ...prev, [standardId]: { id: existing?.id, rating: value } }))
+    const { data, error } = await supabase
+      .from('observation_indicator_ratings')
+      .upsert(
+        { observation_id: id, standard_id: standardId, rating: value, rated_by: profile.id },
+        { onConflict: 'observation_id,standard_id' }
+      )
+      .select('id, standard_id, rating')
+      .single()
+    if (error) {
+      alert(`Could not save rating: ${error.message}`)
+      fetchObservation()
+    } else if (data) {
+      setRatings(prev => ({ ...prev, [standardId]: { id: data.id, rating: data.rating } }))
+    }
+  }
+
+  const ratedCount = (domainId) =>
+    getStandardsForDomain(domainId).filter(s => ratings[s.id]?.rating).length
+
   const completeObservation = async () => {
     setSaving(true)
 
@@ -381,51 +441,100 @@ function ObservationSession() {
     ['question', '❓ Question'],
   ]
 
+  // 1-4 rating scale — matches the summative (SummativeEvaluation.getOverallRating)
+  const RATING_LEVELS = [
+    { value: 1, short: 'NI', label: 'Needs Improvement', on: 'bg-red-600 text-white',    off: 'text-red-700 hover:bg-red-50' },
+    { value: 2, short: 'D',  label: 'Developing',         on: 'bg-yellow-500 text-white', off: 'text-yellow-700 hover:bg-yellow-50' },
+    { value: 3, short: 'E',  label: 'Effective',          on: 'bg-blue-600 text-white',   off: 'text-blue-700 hover:bg-blue-50' },
+    { value: 4, short: 'HE', label: 'Highly Effective',   on: 'bg-green-600 text-white',  off: 'text-green-700 hover:bg-green-50' },
+  ]
+
   // ── Reusable rubric panel (right side on desktop) ──
   const RubricPanel = () => (
     <div className="p-3 space-y-4">
       <p className="text-xs text-[#666666]">
-        {isViewOnly ? 'Indicators evidenced in this observation.' : 'Tap an indicator to attach it to your next note.'}
+        {isViewOnly ? 'Indicators evidenced and rated in this observation.' : 'Tap an indicator to attach it to your next note, and rate it 1–4.'}
       </p>
       {domains.length === 0 && (
         <p className="text-sm text-[#666666]">No rubric found for this staff member.</p>
       )}
       {domains.map(domain => {
         const { covered, total } = domainCoverage(domain.id)
+        const rated = ratedCount(domain.id)
         return (
           <div key={domain.id}>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1 gap-2">
               <p className="text-xs font-semibold text-[#2c3e7e]">{domain.name}</p>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded ${covered > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                {covered}/{total}
-              </span>
+              <div className="flex items-center gap-1 shrink-0">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${covered > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`} title="Indicators with tagged notes">
+                  🏷️ {covered}/{total}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${rated > 0 ? 'bg-[#2c3e7e] text-white' : 'bg-gray-100 text-gray-500'}`} title="Indicators rated">
+                  ⭐ {rated}/{total}
+                </span>
+              </div>
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5">
               {getStandardsForDomain(domain.id).map(std => {
                 const count = coverageFor(std.id)
                 const selected = selectedStandards.includes(std.id)
+                const rating = ratings[std.id]?.rating
                 return (
-                  <button
+                  <div
                     key={std.id}
-                    onClick={() => !isViewOnly && toggleStandard(std.id)}
-                    disabled={isViewOnly}
-                    className={`text-xs px-2 py-2 rounded text-left transition-colors flex items-start gap-2 ${
-                      selected
-                        ? 'bg-[#477fc1] text-white'
-                        : count > 0
-                          ? 'bg-green-50 border border-green-200 text-gray-700'
-                          : 'bg-white border border-gray-200 text-[#666666] hover:bg-gray-50'
-                    } ${isViewOnly ? 'cursor-default' : ''}`}
+                    className={`rounded border ${
+                      selected ? 'border-[#477fc1] bg-[#477fc1]/5'
+                      : count > 0 || rating ? 'border-green-200 bg-green-50'
+                      : 'border-gray-200 bg-white'
+                    }`}
                   >
-                    <span className="flex-1">
-                      <span className="font-semibold">{std.code}</span> · {std.name}
-                    </span>
-                    {count > 0 && (
-                      <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full ${selected ? 'bg-white/25 text-white' : 'bg-green-600 text-white'}`}>
-                        {count}
+                    {/* Indicator label — tap to queue a tag for the next note */}
+                    <button
+                      onClick={() => !isViewOnly && toggleStandard(std.id)}
+                      disabled={isViewOnly}
+                      className={`w-full text-xs px-2 pt-2 pb-1.5 text-left transition-colors flex items-start gap-2 ${
+                        selected ? 'text-[#2c3e7e]' : 'text-[#666666]'
+                      } ${isViewOnly ? 'cursor-default' : 'hover:opacity-80'}`}
+                    >
+                      <span className="flex-1">
+                        <span className="font-semibold">{std.code}</span> · {std.name}
                       </span>
-                    )}
-                  </button>
+                      {count > 0 && (
+                        <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded-full bg-green-600 text-white" title="Notes tagged here">
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                    {/* Rating row */}
+                    <div className="flex items-center gap-1 px-2 pb-2">
+                      <span className="text-[10px] text-gray-400 mr-0.5">Rate</span>
+                      {RATING_LEVELS.map(lvl => {
+                        const active = rating === lvl.value
+                        if (isViewOnly && !active) return null
+                        return (
+                          <button
+                            key={lvl.value}
+                            onClick={() => !isViewOnly && setRating(std.id, lvl.value)}
+                            disabled={isViewOnly}
+                            title={lvl.label}
+                            className={`text-[10px] font-semibold w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                              active ? lvl.on : `bg-white border border-gray-200 ${lvl.off}`
+                            } ${isViewOnly ? 'cursor-default' : ''}`}
+                          >
+                            {lvl.value}
+                          </button>
+                        )
+                      })}
+                      {rating && (
+                        <span className="text-[10px] text-[#666666] ml-1 truncate">
+                          {RATING_LEVELS.find(l => l.value === rating)?.label}
+                        </span>
+                      )}
+                      {isViewOnly && !rating && (
+                        <span className="text-[10px] text-gray-400">Not rated</span>
+                      )}
+                    </div>
+                  </div>
                 )
               })}
             </div>
@@ -787,8 +896,8 @@ function ObservationSession() {
         {/* ── Rubric panel (desktop only) ── */}
         <aside className="hidden lg:flex lg:flex-col w-80 border-l border-gray-200 bg-white shrink-0">
           <div className="p-4 border-b border-gray-100 shrink-0">
-            <h3 className="font-semibold text-[#2c3e7e]">Rubric Coverage</h3>
-            <p className="text-xs text-[#666666]">Indicators tagged this observation</p>
+            <h3 className="font-semibold text-[#2c3e7e]">Rubric Coverage & Ratings</h3>
+            <p className="text-xs text-[#666666]">Tag notes (🏷️) and rate indicators (⭐)</p>
           </div>
           <div className="flex-1 overflow-y-auto">
             <RubricPanel />
