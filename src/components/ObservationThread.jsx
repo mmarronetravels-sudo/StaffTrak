@@ -12,7 +12,7 @@ import { supabase } from '../supabaseClient'
 const fmt = (d) =>
   d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''
 
-export default function ObservationThread({ observationId, viewer, isObserver, isStaff, onOpenCountChange }) {
+export default function ObservationThread({ observationId, viewer, isObserver, isStaff, onOpenCountChange, observationDelivered = true, onDelivered }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -23,6 +23,8 @@ export default function ObservationThread({ observationId, viewer, isObserver, i
   // Reply state
   const [replyTo, setReplyTo] = useState(null)
   const [replyBody, setReplyBody] = useState('')
+  // #12 reusable snippets (evaluator's library)
+  const [snippets, setSnippets] = useState([])
 
   const canPost = isObserver || isStaff
 
@@ -37,7 +39,42 @@ export default function ObservationThread({ observationId, viewer, isObserver, i
     setLoading(false)
   }, [observationId])
 
+  const loadSnippets = useCallback(async () => {
+    if (!isObserver) return
+    const { data } = await supabase
+      .from('feedback_snippets')
+      .select('id, text')
+      .eq('owner_id', viewer.id)
+      .order('created_at', { ascending: true })
+    setSnippets(data || [])
+  }, [isObserver, viewer.id])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadSnippets() }, [loadSnippets])
+
+  // #12 mark feedback delivered the first time the observer contributes.
+  const markDeliveredIfNeeded = async () => {
+    if (!isObserver || observationDelivered) return
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('observations').update({ feedback_delivered_at: now }).eq('id', observationId)
+    if (!error) onDelivered?.(now)
+  }
+
+  const insertSnippet = (text) => setBody((b) => (b.trim() ? `${b}\n${text}` : text))
+
+  const saveSnippet = async () => {
+    if (!body.trim()) return
+    const { error } = await supabase
+      .from('feedback_snippets')
+      .insert({ tenant_id: viewer.tenant_id, owner_id: viewer.id, text: body.trim() })
+    if (error) { alert(`Could not save snippet: ${error.message}`); return }
+    loadSnippets()
+  }
+
+  const deleteSnippet = async (id) => {
+    const { error } = await supabase.from('feedback_snippets').delete().eq('id', id)
+    if (!error) setSnippets((prev) => prev.filter((s) => s.id !== id))
+  }
 
   const openRequired = rows.filter((r) => !r.parent_id && r.requires_response && !r.resolved_at)
   useEffect(() => {
@@ -58,6 +95,7 @@ export default function ObservationThread({ observationId, viewer, isObserver, i
       requires_response: isObserver ? requiresResponse : false,
     })
     if (error) { alert(`Could not post: ${error.message}`); setBusy(false); return }
+    await markDeliveredIfNeeded()
     setBody(''); setRequiresResponse(false)
     await load()
     setBusy(false)
@@ -181,6 +219,27 @@ export default function ObservationThread({ observationId, viewer, isObserver, i
       {/* New comment */}
       {canPost && (
         <div className="border-t border-gray-100 pt-3">
+          {/* #12 reusable snippets (one-tap feedback) */}
+          {isObserver && (
+            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+              {snippets.map((s) => (
+                <span key={s.id} className="inline-flex items-center rounded-full bg-gray-100 text-gray-700 text-xs overflow-hidden">
+                  <button onClick={() => insertSnippet(s.text)} title="Insert snippet" className="px-2 py-1 hover:bg-gray-200">
+                    {s.text.length > 32 ? s.text.slice(0, 32) + '…' : s.text}
+                  </button>
+                  <button onClick={() => deleteSnippet(s.id)} title="Delete snippet" className="px-1.5 py-1 text-gray-400 hover:text-red-600 hover:bg-gray-200">✕</button>
+                </span>
+              ))}
+              <button
+                onClick={saveSnippet}
+                disabled={!body.trim()}
+                title="Save the current text as a reusable snippet"
+                className="text-xs px-2 py-1 rounded-full border border-dashed border-gray-300 text-[#477fc1] hover:bg-gray-50 disabled:opacity-40"
+              >
+                ＋ Save as snippet
+              </button>
+            </div>
+          )}
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}

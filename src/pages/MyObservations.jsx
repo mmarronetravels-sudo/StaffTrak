@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar'
 import { obsTypeLabel } from '../lib/observationTypes'
 import { uploadEvidenceFile, openEvidenceFile } from '../lib/evidenceStorage'
 import ObservationThread from '../components/ObservationThread'
+import { feedbackTurnaround } from '../lib/feedbackTiming'
 
 function MyObservations() {
   const { profile, signOut } = useAuth()
@@ -276,6 +277,14 @@ function MyObservations() {
                               <span className="text-xs px-2 py-1 rounded bg-sky-50 text-sky-700 border border-sky-200">Formative only</span>
                             )}
                             <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-800">Completed</span>
+                            {(() => {
+                              const t = feedbackTurnaround(obs)
+                              return t ? (
+                                <span className={`text-xs px-2 py-1 rounded ${t.within24 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                  ⏱ Feedback in {t.label}
+                                </span>
+                              ) : null
+                            })()}
                           </div>
                           <p className="text-[#666666]">Observer: <span className="font-medium text-[#2c3e7e]">{obs.observer?.full_name}</span></p>
                           <p className="text-sm text-[#666666] mt-1">📅 {formatDate(obs.scheduled_at)}</p>

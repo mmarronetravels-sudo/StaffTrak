@@ -10,6 +10,7 @@ import {
   obsTypeLabel,
   formativeOnlyDefault,
 } from '../lib/observationTypes'
+import { feedbackTurnaround } from '../lib/feedbackTiming'
 
 function Observations() {
   const { profile, signOut } = useAuth()
@@ -314,6 +315,16 @@ function Observations() {
                       <span className={`text-xs px-2 py-1 rounded capitalize ${getStatusBadge(observation.status)}`}>
                         {observation.status?.replace('_', ' ')}
                       </span>
+                      {observation.status === 'completed' && (() => {
+                        const t = feedbackTurnaround(observation)
+                        return t ? (
+                          <span className={`text-xs px-2 py-1 rounded ${t.within24 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`} title={`Feedback delivered ${new Date(t.deliveredAt).toLocaleString()}`}>
+                            ⏱ {t.label}{t.within24 ? ' ✓' : ''}
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-500">Feedback pending</span>
+                        )
+                      })()}
                     </div>
                     <p className="text-sm text-[#666666]">
                       {observation.staff?.position_type || 'Staff Member'}

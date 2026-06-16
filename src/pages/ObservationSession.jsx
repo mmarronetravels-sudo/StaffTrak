@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { obsTypeLabel } from '../lib/observationTypes'
 import { openEvidenceFile } from '../lib/evidenceStorage'
 import ObservationThread from '../components/ObservationThread'
+import { feedbackTurnaround } from '../lib/feedbackTiming'
 
 function ObservationSession() {
   const { id } = useParams()
@@ -360,14 +361,17 @@ function ObservationSession() {
   const completeObservation = async () => {
     setSaving(true)
 
+    const nowIso = new Date().toISOString()
     const { error } = await supabase
       .from('observations')
       .update({
         status: 'completed',
-        ended_at: new Date().toISOString(),
+        ended_at: nowIso,
         feedback: feedback,
         next_steps: nextSteps,
-        share_notes_with_staff: shareNotes
+        share_notes_with_staff: shareNotes,
+        // #12: writing feedback at completion counts as "delivered" (don't overwrite an earlier delivery)
+        ...(feedback.trim() && !observation?.feedback_delivered_at ? { feedback_delivered_at: nowIso } : {}),
       })
       .eq('id', id)
 
@@ -756,6 +760,8 @@ function ObservationSession() {
                     viewer={profile}
                     isObserver={observation?.observer_id === profile.id}
                     isStaff={observation?.staff_id === profile.id}
+                    observationDelivered={!!observation?.feedback_delivered_at}
+                    onDelivered={(ts) => setObservation((o) => ({ ...o, feedback_delivered_at: ts }))}
                   />
                 </div>
               )}
@@ -922,6 +928,15 @@ function ObservationSession() {
                       )}
                     </span>
                   )}
+                  {(() => {
+                    const t = feedbackTurnaround(observation)
+                    if (!t) return null
+                    return (
+                      <span className={`text-xs ml-2 px-2 py-0.5 rounded ${t.within24 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                        Feedback delivered in {t.label}{t.within24 ? ' ✓ (≤24h)' : ''}
+                      </span>
+                    )
+                  })()}
                 </div>
               </div>
             </div>
