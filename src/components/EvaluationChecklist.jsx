@@ -38,8 +38,35 @@ const OWNER_LABEL = { staff: 'Staff', evaluator: 'Evaluator', both: 'Staff + Eva
 
 export default function EvaluationChecklist({ cycle, tasks, profile, isAdmin, isEvaluator, isHR, onTasksChange }) {
   const [busyId, setBusyId] = useState(null)
+  const [editingDateId, setEditingDateId] = useState(null)
+  const [dateDraft, setDateDraft] = useState('')
 
   const ownView = profile?.id === cycle?.staff_id
+
+  // HR/admin and the cycle's evaluator may edit due dates (server enforces via
+  // the set_cycle_task_due_date function; this just gates the UI).
+  const canEditDates = isAdmin || isHR || (isEvaluator && cycle?.evaluator_id === profile?.id)
+
+  const startEditDate = (task) => {
+    setEditingDateId(task.id)
+    setDateDraft(task.due_date || '')
+  }
+
+  const saveDueDate = async (task) => {
+    setBusyId(task.id)
+    const newDate = dateDraft || null
+    const { error } = await supabase.rpc('set_cycle_task_due_date', {
+      p_task_id: task.id,
+      p_due_date: newDate,
+    })
+    if (!error) {
+      onTasksChange(tasks.map((t) => (t.id === task.id ? { ...t, due_date: newDate } : t)))
+      setEditingDateId(null)
+    } else {
+      alert(`Could not update due date: ${error.message}`)
+    }
+    setBusyId(null)
+  }
 
   // Can the current viewer check off this task?
   // Mirrors the cycle_tasks RLS UPDATE policies (server enforces too).
@@ -174,7 +201,43 @@ export default function EvaluationChecklist({ cycle, tasks, profile, isAdmin, is
                   )}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-[#666666]">
                     <span>👤 {OWNER_LABEL[task.owner_role] || task.owner_role}</span>
-                    <span>📅 {formatDue(task.due_date)}</span>
+                    {editingDateId === task.id ? (
+                      <span className="inline-flex items-center gap-1">
+                        📅
+                        <input
+                          type="date"
+                          value={dateDraft}
+                          onChange={(e) => setDateDraft(e.target.value)}
+                          className="px-1.5 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#477fc1]"
+                        />
+                        <button
+                          onClick={() => saveDueDate(task)}
+                          disabled={busyId === task.id}
+                          className="px-2 py-0.5 rounded bg-[#2c3e7e] text-white hover:bg-[#1e2a5e] disabled:opacity-50"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingDateId(null)}
+                          className="px-2 py-0.5 rounded border border-gray-300 text-[#666666] hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        📅 {formatDue(task.due_date)}
+                        {canEditDates && (
+                          <button
+                            onClick={() => startEditDate(task)}
+                            title="Edit due date"
+                            className="text-[#477fc1] hover:underline ml-0.5"
+                          >
+                            ✏️
+                          </button>
+                        )}
+                      </span>
+                    )}
                     {task.completed_at && (
                       <span className="text-green-700">
                         ✓ {new Date(task.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
