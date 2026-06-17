@@ -87,10 +87,34 @@ async function isSummativeDone(staffId, window) {
   return data.some((r) => within(window, r.created_at))
 }
 
+// Goal-progress task (#6) is done when EVERY in-year goal has a SUBMITTED
+// goal_review for that phase (mid_year / final). Cycle-scoped (goal_reviews
+// carry cycle_id), so this checker needs the cycle, not just the staff id.
+async function isGoalProgressDone(cycle, phase, window) {
+  const { data: goals } = await supabase
+    .from('goals')
+    .select('id, created_at')
+    .eq('staff_id', cycle.staff_id)
+  const goalIds = (goals || []).filter((g) => within(window, g.created_at)).map((g) => g.id)
+  if (goalIds.length === 0) return false
+
+  const { data: reviews } = await supabase
+    .from('goal_reviews')
+    .select('goal_id')
+    .eq('cycle_id', cycle.id)
+    .eq('phase', phase)
+    .eq('entry_state', 'submitted')
+  const reviewed = new Set((reviews || []).map((r) => r.goal_id))
+  return goalIds.every((id) => reviewed.has(id))
+}
+
+// Each checker receives (cycle, window) and returns whether the task is done.
 const CHECKERS = {
-  self_reflection: isSelfReflectionDone,
-  goal_setting: isGoalSettingDone,
-  summative: isSummativeDone,
+  self_reflection: (cycle, w) => isSelfReflectionDone(cycle.staff_id, w),
+  goal_setting: (cycle, w) => isGoalSettingDone(cycle.staff_id, w),
+  summative: (cycle, w) => isSummativeDone(cycle.staff_id, w),
+  update_goal_progress_midyear: (cycle, w) => isGoalProgressDone(cycle, 'mid_year', w),
+  update_goal_progress_final: (cycle, w) => isGoalProgressDone(cycle, 'final', w),
 }
 
 // ── Observation / meeting record fetchers (for linked_id matching) ──
@@ -219,7 +243,7 @@ export async function reconcileCycleTasks(cycle, tasks, currentUserId) {
   )
   for (const task of simpleCandidates) {
     try {
-      if (await CHECKERS[task.task_key](cycle.staff_id, window)) {
+      if (await CHECKERS[task.task_key](cycle, window)) {
         updates.push({ id: task.id, patch: {} })
       }
     } catch {
