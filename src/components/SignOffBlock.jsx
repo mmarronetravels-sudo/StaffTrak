@@ -86,13 +86,25 @@ export default function SignOffBlock({
   const setSignature = async (party, value) => {
     if (!row?.id) return
     setSaving(true)
-    const col = party === 'staff' ? 'staff_signed_at' : 'evaluator_signed_at'
-    const { data, error } = await supabase
-      .from(table)
-      .update({ [col]: value })
-      .eq('id', row.id)
-      .select()
-      .single()
+    let data, error
+    if (table === 'goals') {
+      // Goal sign-off goes through a SECURITY DEFINER RPC (migration 029): the
+      // staff UPDATE policy is draft-only, but signing happens after a goal is
+      // finalized. The function stamps only the signature column, choosing the
+      // column by the caller's identity (staff vs evaluator/HR).
+      ;({ data, error } = await supabase.rpc('sign_goal', {
+        p_goal_id: row.id,
+        p_unsign: value === null,
+      }))
+    } else {
+      const col = party === 'staff' ? 'staff_signed_at' : 'evaluator_signed_at'
+      ;({ data, error } = await supabase
+        .from(table)
+        .update({ [col]: value })
+        .eq('id', row.id)
+        .select()
+        .single())
+    }
     setSaving(false)
     if (error) {
       alert(`Could not update signature: ${error.message}`)
