@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
+import { rubricNameFor } from '../lib/rubricRouting'
 
 function SelfReflection() {
   const { profile, signOut } = useAuth()
@@ -40,20 +41,11 @@ function SelfReflection() {
       }
     }
 
-    // Priority 2: Fallback to staff_type/position matching
+    // Priority 2: Fallback to staff_type/position matching.
+    // rubricNameFor() detects counselors/admins robustly from position_type
+    // (e.g. 'school_counselor'), so counselors get the School Counselor Rubric.
     if (!rubricData) {
-      let rubricName = ''
-      if (profile.staff_type === 'licensed') {
-        if (profile.position_type === 'counselor') {
-          rubricName = 'School Counselor Rubric'
-        } else if (profile.position_type === 'administrator') {
-          rubricName = 'Administrator/Educational Leader Rubric'
-        } else {
-          rubricName = 'Teacher Rubric (NSQOT-Based)'
-        }
-      } else {
-        rubricName = 'Non-Licensed 4-Domain Rubric'
-      }
+      const rubricName = rubricNameFor(profile)
 
       const { data, error } = await supabase
         .from('rubrics')

@@ -8,6 +8,7 @@ import Navbar from '../components/Navbar'
 import { obsTypeLabel } from '../lib/observationTypes'
 import { fetchScoredIndicatorRatings, fetchEvidenceTagsForStaff } from '../lib/summativeRollup'
 import GoalReviewPanel from '../components/GoalReviewPanel'
+import { licensedRubricFragment } from '../lib/rubricRouting'
 
 const RATING_OPTIONS = ['Highly Effective', 'Effective', 'Developing', 'Needs Improvement']
 const ratingTextColor = (rating) =>
@@ -121,7 +122,10 @@ function SummativeEvaluation() {
       }
     }
 
-    // Priority 2: Fallback to staff_type/position matching
+    // Priority 2: Fallback to staff_type/position matching. licensedRubricFragment
+    // detects counselors/admins robustly from position_type (e.g.
+    // 'school_counselor'); returns null for classified, leaving their lookup
+    // unchanged.
     if (!rubricData) {
       let rubricQuery = supabase
         .from('rubrics')
@@ -129,13 +133,8 @@ function SummativeEvaluation() {
         .eq('staff_type', staffData.staff_type)
         .eq('is_active', true)
 
-      if (staffData.position_type === 'teacher') {
-        rubricQuery = rubricQuery.ilike('name', '%teacher%')
-      } else if (staffData.position_type === 'counselor') {
-        rubricQuery = rubricQuery.ilike('name', '%counselor%')
-      } else if (staffData.position_type === 'administrator') {
-        rubricQuery = rubricQuery.ilike('name', '%administrator%')
-      }
+      const frag = licensedRubricFragment(staffData)
+      if (frag) rubricQuery = rubricQuery.ilike('name', `%${frag}%`)
 
       const { data } = await rubricQuery.limit(1).single()
       rubricData = data

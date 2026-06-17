@@ -1,4 +1,5 @@
 import { supabase } from '../supabaseClient'
+import { licensedRubricFragment } from './rubricRouting'
 
 // ============================================================
 // Load the rubric (domains + indicators) for a staff member.
@@ -28,9 +29,10 @@ export async function loadRubricForStaff(staff) {
       .eq('staff_type', staff.staff_type)
       .eq('is_active', true)
 
-    if (staff.position_type === 'teacher') q = q.ilike('name', '%teacher%')
-    else if (staff.position_type === 'counselor') q = q.ilike('name', '%counselor%')
-    else if (staff.position_type === 'administrator') q = q.ilike('name', '%administrator%')
+    // Detect counselors/admins robustly from position_type (e.g.
+    // 'school_counselor'); null for classified leaves their lookup unchanged.
+    const frag = licensedRubricFragment(staff)
+    if (frag) q = q.ilike('name', `%${frag}%`)
 
     const { data } = await q.limit(1).maybeSingle()
     rubric = data
