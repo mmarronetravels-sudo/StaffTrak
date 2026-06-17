@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
+import SignOffBlock from '../components/SignOffBlock'
 import { rubricNameFor } from '../lib/rubricRouting'
 
 function SelfReflection() {
@@ -86,7 +87,7 @@ function SelfReflection() {
 
     const { data: existingData } = await supabase
       .from('self_assessments')
-      .select('id, rubric_id, domain_scores, content, submitted_at, created_at')
+      .select('id, rubric_id, domain_scores, content, submitted_at, created_at, staff_signed_at, evaluator_signed_at')
       .eq('staff_id', profile.id)
       .eq('assessment_type', 'self_reflection')
       .gte('created_at', '2025-07-01')
@@ -335,6 +336,26 @@ function SelfReflection() {
             rows="4"
           />
         </div>
+
+        {/* Sign-off (Banked #1). Sign once your reflection is submitted; your
+            evaluator signs after reviewing it in the Initial Goals meeting. */}
+        {existingReflection && (
+          <div className="mt-6">
+            <SignOffBlock
+              table="self_assessments"
+              row={existingReflection}
+              canStaffSign={isSubmitted}
+              canEvaluatorSign={false}
+              notReadyText="Submit your self-reflection to sign it."
+              onChange={(updated) => setExistingReflection(updated)}
+            />
+            {!isSubmitted && (
+              <p className="text-xs text-[#666666] mt-2">
+                You can sign once you submit your self-reflection.
+              </p>
+            )}
+          </div>
+        )}
 
         {!isSubmitted && (
   <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg">

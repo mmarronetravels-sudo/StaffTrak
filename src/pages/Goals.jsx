@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { notifyGoalSubmitted } from '../services/emailService'
 import Navbar from '../components/Navbar'
 import GoalReviewPanel from '../components/GoalReviewPanel'
+import SignOffBlock from '../components/SignOffBlock'
 import { REVIEW_PHASE_ORDER } from '../lib/goalReviews'
 
 function Goals() {
@@ -51,7 +52,7 @@ function Goals() {
   const fetchGoals = async () => {
     const { data, error } = await supabase
       .from('goals')
-      .select('id, goal_type, title, description, content_standards, assessments, context_students, baseline_data, target_data, rationale, strategies, professional_learning, status, evaluator_feedback, mid_year_reflection, end_year_reflection, end_year_results, created_at')
+      .select('id, goal_type, title, description, content_standards, assessments, context_students, baseline_data, target_data, rationale, strategies, professional_learning, status, evaluator_feedback, mid_year_reflection, end_year_reflection, end_year_results, created_at, staff_signed_at, evaluator_signed_at')
       .eq('staff_id', profile.id)
       .order('created_at', { ascending: false })
 
@@ -317,6 +318,22 @@ function Goals() {
                               />
                             ))}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Sign-off (Banked #1): you sign your goal; your
+                          evaluator signs it when approving in Goal Approvals. */}
+                      {goal.status !== 'draft' && (
+                        <div className="pt-2">
+                          <SignOffBlock
+                            table="goals"
+                            row={goal}
+                            canStaffSign={true}
+                            canEvaluatorSign={false}
+                            onChange={(updated) =>
+                              setGoals(goals.map((g) => (g.id === updated.id ? { ...g, ...updated } : g)))
+                            }
+                          />
                         </div>
                       )}
 

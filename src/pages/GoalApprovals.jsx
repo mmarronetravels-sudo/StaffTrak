@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { notifyGoalApproved, notifyGoalRevision } from '../services/emailService'
 import Navbar from '../components/Navbar'
+import SignOffBlock from '../components/SignOffBlock'
 
 function GoalApprovals() {
   const { profile, signOut, isEvaluator } = useAuth()
@@ -263,6 +264,25 @@ function GoalApprovals() {
                           <p className="text-sm text-[#666666] bg-gray-50 p-3 rounded">{goal.professional_learning}</p>
                         </div>
                       )}
+                    </div>
+
+                    {/* Sign-off (Banked #1): sign the goal before approving —
+                        approved goals leave this list. The staff member signs on
+                        their own Goals page. */}
+                    <div className="mt-6">
+                      <SignOffBlock
+                        table="goals"
+                        row={goal}
+                        canStaffSign={false}
+                        canEvaluatorSign={true}
+                        onChange={(updated) => {
+                          setPendingGoals(pendingGoals.map((g) => (g.id === updated.id ? { ...g, ...updated } : g)))
+                          setSelectedGoal((sg) => (sg && sg.id === updated.id ? { ...sg, ...updated } : sg))
+                        }}
+                      />
+                      <p className="text-xs text-[#666666] mt-2">
+                        Sign before approving — approved goals move out of this list.
+                      </p>
                     </div>
 
                     {/* Feedback & Actions */}

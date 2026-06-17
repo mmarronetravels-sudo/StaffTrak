@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import EvaluationFeedbackPanel from '../components/EvaluationFeedbackPanel'
+import SignOffBlock from '../components/SignOffBlock'
 import { phaseForMeetingType } from '../lib/evaluationFeedback'
 import GoalReviewPanel from '../components/GoalReviewPanel'
 import { reviewPhaseForMeetingType } from '../lib/goalReviews'
@@ -78,7 +79,7 @@ function MeetingSession() {
     // Fetch self-reflection
     const { data: reflectionData } = await supabase
       .from('self_assessments')
-      .select('id, rubric_id, domain_scores, content, submitted_at, created_at')
+      .select('id, rubric_id, domain_scores, content, submitted_at, created_at, staff_signed_at, evaluator_signed_at')
       .eq('staff_id', staffId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -403,6 +404,24 @@ function MeetingSession() {
                       >
                         View Full Self-Reflection →
                       </a>
+
+                      {/* Evaluator sign-off on the self-reflection (Banked #1).
+                          Surfaced at the Initial Goals meeting where the
+                          evaluator reviews it. The staff member signs on their
+                          own Self-Reflection page. */}
+                      {meeting.meeting_type === 'initial_goals' && (
+                        <SignOffBlock
+                          table="self_assessments"
+                          row={selfReflection}
+                          canStaffSign={false}
+                          canEvaluatorSign={
+                            isAdmin || isHR || cycle?.evaluator_id === profile?.id
+                          }
+                          onChange={(updated) =>
+                            setSelfReflection({ ...selfReflection, ...updated })
+                          }
+                        />
+                      )}
                     </div>
                   ) : (
                     <p className="text-sm text-[#666666] italic">
