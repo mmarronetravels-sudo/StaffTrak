@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
+import EvaluationFeedbackPanel from './EvaluationFeedbackPanel'
+import { FEEDBACK_PHASE_ORDER } from '../lib/evaluationFeedback'
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -96,6 +98,7 @@ export default function EvaluationChecklist({ cycle, tasks, profile, isAdmin, is
     : '—'
 
   return (
+    <div className="space-y-6">
     <div className="bg-white rounded-lg shadow">
       {/* ── Cycle header ── */}
       <div className="p-5 border-b border-gray-100">
@@ -193,6 +196,30 @@ export default function EvaluationChecklist({ cycle, tasks, profile, isAdmin, is
           })}
         </ul>
       )}
+    </div>
+
+      {/* ── Phase feedback (#5): Initial / Mid-Year / Final ── */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-5 border-b border-gray-100">
+          <h3 className="font-semibold text-[#2c3e7e]">Evaluation Feedback</h3>
+          <p className="text-sm text-[#666666] mt-0.5">
+            Initial, Mid-Year, and Final feedback for this cycle. The evaluator signs each phase;
+            the staff member responds and acknowledges.
+          </p>
+        </div>
+        <div className="p-5 space-y-4">
+          {FEEDBACK_PHASE_ORDER.map((phase) => (
+            <EvaluationFeedbackPanel
+              key={phase}
+              cycle={cycle}
+              phase={phase}
+              profile={profile}
+              isAdmin={isAdmin}
+              isHR={isHR}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

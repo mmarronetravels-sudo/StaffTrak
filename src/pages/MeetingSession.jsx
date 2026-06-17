@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import EvaluationFeedbackPanel from '../components/EvaluationFeedbackPanel'
+import { phaseForMeetingType } from '../lib/evaluationFeedback'
 
 function MeetingSession() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { profile, signOut, isEvaluator } = useAuth()
-  
+  const { profile, signOut, isEvaluator, isAdmin, isHR } = useAuth()
+
   const [meeting, setMeeting] = useState(null)
+  const [cycle, setCycle] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   
@@ -50,6 +53,18 @@ function MeetingSession() {
       setMeeting(data)
       setNotes(data.notes || '')
       setActionItems(data.action_items || '')
+
+      // Resolve the staff member's current evaluation cycle so the phase
+      // feedback panel (#5) can attach to it.
+      const { data: cycleData } = await supabase
+        .from('evaluation_cycles')
+        .select('id, tenant_id, staff_id, evaluator_id')
+        .eq('staff_id', data.staff_id)
+        .order('school_year', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      setCycle(cycleData || null)
 
       // Fetch context data based on meeting type
       fetchContextData(data.staff_id, data.meeting_type)
@@ -254,6 +269,10 @@ function MeetingSession() {
 
   const isCompleted = !!meeting.completed_at
   const isStaffView = profile?.id === meeting.staff_id
+  // Which phase of cycle feedback this meeting carries (#5). When present, the
+  // feedback panel's acknowledgment is the single sign-off for the meeting.
+  const feedbackPhase = phaseForMeetingType(meeting.meeting_type)
+  const showFeedbackPanel = !!(cycle && feedbackPhase)
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -564,8 +583,20 @@ function MeetingSession() {
               </button>
             )}
 
-            {/* Sign-off Section */}
-            {isCompleted && (
+            {/* Phase Feedback (#5) — the staff acknowledgment is the sign-off */}
+            {showFeedbackPanel && (
+              <EvaluationFeedbackPanel
+                cycle={cycle}
+                phase={feedbackPhase}
+                profile={profile}
+                isAdmin={isAdmin}
+                isHR={isHR}
+                meetingId={meeting.id}
+              />
+            )}
+
+            {/* Sign-off Section (fallback when no linked cycle/phase feedback) */}
+            {isCompleted && !showFeedbackPanel && (
               <div className="bg-white rounded-lg shadow">
                 <div className="p-4 border-b border-gray-100">
                   <h3 className="font-semibold text-[#2c3e7e]">✍️ Sign-Off</h3>
