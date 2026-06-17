@@ -399,8 +399,8 @@ function MeetingSession() {
                         </div>
                       )}
 
-                      <a 
-                        href={`/self-reflection`} 
+                      <a
+                        href={`/self-reflection?staff=${meeting.staff_id}`}
                         className="text-sm text-[#477fc1] hover:underline block"
                         target="_blank"
                       >

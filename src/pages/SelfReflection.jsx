@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
@@ -7,13 +8,22 @@ import { rubricNameFor } from '../lib/rubricRouting'
 
 function SelfReflection() {
   const { profile, signOut } = useAuth()
+  const [searchParams] = useSearchParams()
+  // When an evaluator/HR opens a specific staff member's reflection (e.g. from
+  // the Initial Goals meeting), `?staff=<id>` selects whose reflection to load.
+  // With no param we load the current user's own reflection (editable).
+  const staffParam = searchParams.get('staff')
+  const targetStaffId = staffParam || profile?.id
+  const isOwnView = !staffParam || staffParam === profile?.id
+
   const [rubric, setRubric] = useState(null)
   const [domains, setDomains] = useState([])
   const [standards, setStandards] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [existingReflection, setExistingReflection] = useState(null)
-  
+  const [viewedStaff, setViewedStaff] = useState(null)
+
   const [scores, setScores] = useState({})
   const [reflections, setReflections] = useState({})
   const [overallReflection, setOverallReflection] = useState('')
@@ -24,42 +34,69 @@ function SelfReflection() {
     if (profile) {
       fetchRubricAndReflection()
     }
-  }, [profile])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, staffParam])
 
  const fetchRubricAndReflection = async () => {
-    let rubricData = null
+    // 1. Load the target staff member's reflection first (their own, or the one
+    //    an evaluator/HR is viewing). RLS gates who may read it.
+    const { data: existingData } = await supabase
+      .from('self_assessments')
+      .select('id, domain_scores, content, submitted_at, created_at, staff_signed_at, evaluator_signed_at')
+      .eq('staff_id', targetStaffId)
+      .eq('assessment_type', 'self_reflection')
+      .gte('created_at', '2025-07-01')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
-    // Priority 1: Use assigned_rubric_id if set
-    if (profile.assigned_rubric_id) {
-      const { data, error } = await supabase
-        .from('rubrics')
-        .select('id, name')
-        .eq('id', profile.assigned_rubric_id)
-        .single()
-
-      if (!error && data) {
-        rubricData = data
-      }
+    if (existingData) {
+      setExistingReflection(existingData)
+      setScores(existingData.domain_scores || {})
+      setReflections(existingData.content?.reflections || {})
+      setOverallReflection(existingData.content?.overall_reflection || '')
     }
 
-    // Priority 2: Fallback to staff_type/position matching.
-    // rubricNameFor() detects counselors/admins robustly from position_type
-    // (e.g. 'school_counselor'), so counselors get the School Counselor Rubric.
-    if (!rubricData) {
-      const rubricName = rubricNameFor(profile)
+    // 2. Resolve the rubric. Prefer the one stored on the reflection itself
+    //    (content.rubric_id); otherwise derive it from the relevant profile.
+    let rubricData = null
+    const reflectionRubricId = existingData?.content?.rubric_id
+    if (reflectionRubricId) {
+      const { data } = await supabase
+        .from('rubrics').select('id, name').eq('id', reflectionRubricId).single()
+      if (data) rubricData = data
+    }
 
-      const { data, error } = await supabase
-        .from('rubrics')
-        .select('id, name')
-        .eq('name', rubricName)
+    // Identify whose reflection this is (for the header) and, when viewing
+    // someone else's, fall back to their assigned rubric if needed.
+    let basisProfile = profile
+    if (!isOwnView) {
+      const { data: staffProfile } = await supabase
+        .from('profiles')
+        .select('id, full_name, assigned_rubric_id, position_type, staff_type')
+        .eq('id', targetStaffId)
         .single()
+      setViewedStaff(staffProfile || null)
+      if (staffProfile) basisProfile = staffProfile
+    }
 
-      if (error || !data) {
-        console.error('Error fetching rubric:', error)
-        setLoading(false)
-        return
-      }
-      rubricData = data
+    if (!rubricData && basisProfile?.assigned_rubric_id) {
+      const { data } = await supabase
+        .from('rubrics').select('id, name').eq('id', basisProfile.assigned_rubric_id).single()
+      if (data) rubricData = data
+    }
+
+    // Last resort (mainly the own-view blank form): match by role/position name.
+    if (!rubricData && basisProfile) {
+      const rubricName = rubricNameFor(basisProfile)
+      const { data } = await supabase
+        .from('rubrics').select('id, name').eq('name', rubricName).single()
+      if (data) rubricData = data
+    }
+
+    if (!rubricData) {
+      setLoading(false)
+      return
     }
 
     setRubric(rubricData)
@@ -83,23 +120,6 @@ function SelfReflection() {
       if (standardData) {
         setStandards(standardData)
       }
-    }
-
-    const { data: existingData } = await supabase
-      .from('self_assessments')
-      .select('id, domain_scores, content, submitted_at, created_at, staff_signed_at, evaluator_signed_at')
-      .eq('staff_id', profile.id)
-      .eq('assessment_type', 'self_reflection')
-      .gte('created_at', '2025-07-01')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (existingData) {
-      setExistingReflection(existingData)
-      setScores(existingData.domain_scores || {})
-      setReflections(existingData.content?.reflections || {})
-      setOverallReflection(existingData.content?.overall_reflection || '')
     }
 
     setLoading(false)
@@ -215,6 +235,9 @@ function SelfReflection() {
 
 
   const isSubmitted = existingReflection?.submitted_at ? true : false
+  // Inputs are locked when the reflection is submitted, or whenever an
+  // evaluator/HR is viewing someone else's reflection (read-only).
+  const readOnly = !isOwnView || isSubmitted
 
   if (loading) {
     return (
@@ -234,8 +257,15 @@ function SelfReflection() {
       <main className="max-w-5xl mx-auto px-4 py-8 pb-32">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-[#2c3e7e]">Self-Reflection</h2>
+            <h2 className="text-2xl font-bold text-[#2c3e7e]">
+              {isOwnView ? 'Self-Reflection' : `${viewedStaff?.full_name || 'Staff'} — Self-Reflection`}
+            </h2>
             <p className="text-[#666666]">{rubric?.name} • {currentSchoolYear}</p>
+            {!isOwnView && (
+              <span className="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-[#666666] rounded text-xs">
+                Read-only — viewing as evaluator
+              </span>
+            )}
           </div>
           <div className="text-right">
             <div className="text-3xl font-bold text-[#2c3e7e]">{getCompletionPercentage()}%</div>
@@ -294,13 +324,13 @@ function SelfReflection() {
                         {[1, 2, 3, 4].map(rating => (
                           <button
                             key={rating}
-                            onClick={() => !isSubmitted && handleSetScore(standard.id, rating)}
-                            disabled={isSubmitted}
+                            onClick={() => !readOnly && handleSetScore(standard.id, rating)}
+                            disabled={readOnly}
                             className={`w-10 h-10 rounded-lg font-bold transition-all ${
                               scores[standard.id] === rating
                                 ? `${getRatingColor(rating)} text-white`
                                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            } ${isSubmitted ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                            } ${readOnly ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                             title={getRatingLabel(rating)}
                           >
                             {rating}
@@ -312,7 +342,7 @@ function SelfReflection() {
                     <textarea
                       value={reflections[standard.id] || ''}
                       onChange={(e) => handleSetReflection(standard.id, e.target.value)}
-                      disabled={isSubmitted}
+                      disabled={readOnly}
                       placeholder="Add reflection or notes (optional)..."
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#477fc1] disabled:bg-gray-50"
                       rows="2"
@@ -332,26 +362,26 @@ function SelfReflection() {
           <textarea
             value={overallReflection}
             onChange={(e) => setOverallReflection(e.target.value)}
-            disabled={isSubmitted}
+            disabled={readOnly}
             placeholder="Write your overall reflection here..."
             className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#477fc1] disabled:bg-gray-50"
             rows="4"
           />
         </div>
 
-        {/* Sign-off (Banked #1). Sign once your reflection is submitted; your
-            evaluator signs after reviewing it in the Initial Goals meeting. */}
+        {/* Sign-off (Banked #1). The staff member signs their own (once
+            submitted); an evaluator/HR viewing it can sign the evaluator side. */}
         {existingReflection && (
           <div className="mt-6">
             <SignOffBlock
               table="self_assessments"
               row={existingReflection}
-              canStaffSign={isSubmitted}
-              canEvaluatorSign={false}
+              canStaffSign={isOwnView && isSubmitted}
+              canEvaluatorSign={!isOwnView}
               notReadyText="Submit your self-reflection to sign it."
               onChange={(updated) => setExistingReflection(updated)}
             />
-            {!isSubmitted && (
+            {isOwnView && !isSubmitted && (
               <p className="text-xs text-[#666666] mt-2">
                 You can sign once you submit your self-reflection.
               </p>
@@ -359,7 +389,7 @@ function SelfReflection() {
           </div>
         )}
 
-        {!isSubmitted && (
+        {isOwnView && !isSubmitted && (
   <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg">
     <div className="max-w-5xl mx-auto flex gap-4">
       <button
@@ -380,7 +410,7 @@ function SelfReflection() {
   </div>
 )}
 
-        {!isSubmitted && getCompletionPercentage() < 100 && (
+        {isOwnView && !isSubmitted && getCompletionPercentage() < 100 && (
           <p className="text-center text-sm text-[#666666] mt-3">
             Rate all standards to submit your self-reflection.
           </p>
