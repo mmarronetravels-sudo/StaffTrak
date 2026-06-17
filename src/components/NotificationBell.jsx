@@ -47,6 +47,8 @@ export default function NotificationBell() {
       case 'observation_scheduled': return '/my-observations'
       case 'meeting_scheduled': return '/my-meetings'
       case 'goal_review_submitted': return '/checklists'
+      case 'task_due_reminder':
+        return isEvaluator ? '/checklists' : '/my-checklist'
       case 'required_response_reminder':
         return isEvaluator ? '/observations' : '/my-observations'
       default:
