@@ -32,30 +32,32 @@ export async function createNotification({
   sendEmail = false,
 }) {
   if (!userId || !tenantId || !title) return { ok: false }
-  const { data, error } = await supabase
-    .from('notifications')
-    .insert({
-      user_id: userId,
-      tenant_id: tenantId,
-      notification_type: type || null,
-      title,
-      message,
-      related_entity_type: relatedEntityType,
-      related_entity_id: relatedEntityId,
-    })
-    .select('id')
-    .single()
+  // NOTE: do NOT chain .select() here. The row belongs to the RECIPIENT, but the
+  // notifications SELECT policy is user_id = auth.uid(); a sender reading back a
+  // recipient's row returns 0 rows and .single() throws — which previously
+  // aborted this function before the email ever sent. A plain insert (no
+  // RETURNING) succeeds under the tenant-scoped INSERT policy.
+  const { error } = await supabase.from('notifications').insert({
+    user_id: userId,
+    tenant_id: tenantId,
+    notification_type: type || null,
+    title,
+    message,
+    related_entity_type: relatedEntityType,
+    related_entity_id: relatedEntityId,
+  })
   if (error) {
     console.error('createNotification failed:', error.message)
     return { ok: false, error }
   }
-  if (sendEmail) emailRecipient(userId, data?.id, title, message)
-  return { ok: true, id: data?.id }
+  if (sendEmail) emailRecipient(userId, title, message)
+  return { ok: true }
 }
 
-// Look up the recipient's email + name and send the generic email, then mark
-// the notification as emailed. All best-effort.
-async function emailRecipient(userId, notificationId, title, message) {
+// Look up the recipient's email + name and send the generic email. Best-effort.
+// (We can't stamp sent_via_email from here — the sender isn't the row owner, so
+// the UPDATE policy denies it; the email send itself is what matters.)
+async function emailRecipient(userId, title, message) {
   try {
     const { data: recipient } = await supabase
       .from('profiles')
@@ -63,15 +65,12 @@ async function emailRecipient(userId, notificationId, title, message) {
       .eq('id', userId)
       .single()
     if (!recipient?.email) return
-    const res = await notifyGeneric({
+    await notifyGeneric({
       to: recipient.email,
       subject: title,
       message: message || title,
       recipientName: recipient.full_name,
     })
-    if (res?.success && notificationId) {
-      await supabase.from('notifications').update({ sent_via_email: true }).eq('id', notificationId)
-    }
   } catch (e) {
     console.error('notification email failed:', e?.message)
   }
