@@ -13,6 +13,7 @@ function Goals() {
   const [cycle, setCycle] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [editingGoalId, setEditingGoalId] = useState(null)
   const [expandedGoal, setExpandedGoal] = useState(null)
   const [newGoal, setNewGoal] = useState({
     goal_type: 'slg',
@@ -63,44 +64,95 @@ function Goals() {
     fetchCycle()
   }
 
-  const handleAddGoal = async (e) => {
-    e.preventDefault()
-    
-    const { data, error } = await supabase
-      .from('goals')
-      .insert([{
-        staff_id: profile.id,
-        goal_type: newGoal.goal_type,
-        title: newGoal.title,
-        description: newGoal.description,
-        content_standards: newGoal.content_standards,
-        assessments: newGoal.assessments,
-        context_students: newGoal.context_students,
-        baseline_data: newGoal.baseline_data,
-        target_data: newGoal.target_data,
-        rationale: newGoal.rationale,
-        strategies: newGoal.strategies,
-        professional_learning: newGoal.professional_learning,
-        status: 'draft'
-      }])
-      .select()
+  const emptyGoal = {
+    goal_type: 'slg',
+    title: '',
+    description: '',
+    content_standards: '',
+    assessments: '',
+    context_students: '',
+    baseline_data: '',
+    target_data: '',
+    rationale: '',
+    strategies: '',
+    professional_learning: ''
+  }
 
-    if (!error) {
+  const openAddModal = () => {
+    setEditingGoalId(null)
+    setNewGoal(emptyGoal)
+    setShowAddModal(true)
+  }
+
+  // Only draft goals are editable by staff (submitted/approved are locked).
+  const openEditModal = (goal) => {
+    setEditingGoalId(goal.id)
+    setNewGoal({
+      goal_type: goal.goal_type || 'slg',
+      title: goal.title || '',
+      description: goal.description || '',
+      content_standards: goal.content_standards || '',
+      assessments: goal.assessments || '',
+      context_students: goal.context_students || '',
+      baseline_data: goal.baseline_data || '',
+      target_data: goal.target_data || '',
+      rationale: goal.rationale || '',
+      strategies: goal.strategies || '',
+      professional_learning: goal.professional_learning || ''
+    })
+    setShowAddModal(true)
+  }
+
+  const closeModal = () => {
+    setShowAddModal(false)
+    setEditingGoalId(null)
+    setNewGoal(emptyGoal)
+  }
+
+  const handleSaveGoal = async (e) => {
+    e.preventDefault()
+
+    const fields = {
+      goal_type: newGoal.goal_type,
+      title: newGoal.title,
+      description: newGoal.description,
+      content_standards: newGoal.content_standards,
+      assessments: newGoal.assessments,
+      context_students: newGoal.context_students,
+      baseline_data: newGoal.baseline_data,
+      target_data: newGoal.target_data,
+      rationale: newGoal.rationale,
+      strategies: newGoal.strategies,
+      professional_learning: newGoal.professional_learning
+    }
+
+    if (editingGoalId) {
+      const { data, error } = await supabase
+        .from('goals')
+        .update(fields)
+        .eq('id', editingGoalId)
+        .select()
+
+      if (error) {
+        alert('Could not save changes: ' + error.message)
+        return
+      }
+      if (data && data[0]) {
+        setGoals(goals.map(g => (g.id === editingGoalId ? { ...g, ...data[0] } : g)))
+      }
+      closeModal()
+    } else {
+      const { data, error } = await supabase
+        .from('goals')
+        .insert([{ staff_id: profile.id, ...fields, status: 'draft' }])
+        .select()
+
+      if (error) {
+        alert('Could not create goal: ' + error.message)
+        return
+      }
       setGoals([data[0], ...goals])
-      setShowAddModal(false)
-      setNewGoal({
-        goal_type: 'slg',
-        title: '',
-        description: '',
-        content_standards: '',
-        assessments: '',
-        context_students: '',
-        baseline_data: '',
-        target_data: '',
-        rationale: '',
-        strategies: '',
-        professional_learning: ''
-      })
+      closeModal()
     }
   }
 
@@ -134,15 +186,25 @@ function Goals() {
   }
 
   const handleSubmitForApproval = async (goalId) => {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('goals')
     .update({ status: 'submitted' })
     .eq('id', goalId)
+    .select()
 
-  if (!error) {
+  if (error) {
+    alert('Could not submit for approval: ' + error.message)
+    return
+  }
+  if (!data || data.length === 0) {
+    alert('Submit was blocked — the goal could not be updated. This is usually a permissions (RLS) issue on the goals table.')
+    return
+  }
+
+  {
     // Update local state
     const updatedGoal = goals.find(g => g.id === goalId)
-    setGoals(goals.map(g => 
+    setGoals(goals.map(g =>
       g.id === goalId ? { ...g, status: 'submitted' } : g
     ))
 
@@ -184,7 +246,7 @@ function Goals() {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-[#2c3e7e]">My Goals</h2>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={openAddModal}
             className="bg-[#2c3e7e] text-white px-4 py-2 rounded-lg hover:bg-[#1e2a5e]"
           >
             + New Goal
@@ -206,7 +268,7 @@ function Goals() {
           <div className="bg-white p-8 rounded-lg shadow text-center">
             <p className="text-[#666666] mb-4">No goals created yet.</p>
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={openAddModal}
               className="bg-[#2c3e7e] text-white px-4 py-2 rounded-lg hover:bg-[#1e2a5e]"
             >
               Create Your First Goal
@@ -345,12 +407,18 @@ function Goals() {
   </div>
 )}
 
-{/* Submit Button for Draft Goals */}
-{goal.status === 'draft' && (
-  <div className="pt-4 border-t border-gray-200">
+{/* Edit + Submit for editable (draft / revision-requested) goals */}
+{(goal.status === 'draft' || goal.status === 'revision_requested') && (
+  <div className="pt-4 border-t border-gray-200 flex gap-3">
+    <button
+      onClick={() => openEditModal(goal)}
+      className="flex-1 px-4 py-2 border border-[#2c3e7e] text-[#2c3e7e] rounded-lg hover:bg-gray-50"
+    >
+      Edit Goal
+    </button>
     <button
       onClick={() => handleSubmitForApproval(goal.id)}
-      className="w-full px-4 py-2 bg-[#2c3e7e] text-white rounded-lg hover:bg-[#1e2a5e]"
+      className="flex-1 px-4 py-2 bg-[#2c3e7e] text-white rounded-lg hover:bg-[#1e2a5e]"
     >
       Submit for Approval
     </button>
@@ -371,16 +439,18 @@ function Goals() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-[#2c3e7e]">Beginning of Year Goal Setting</h3>
+                <h3 className="text-xl font-bold text-[#2c3e7e]">
+                  {editingGoalId ? 'Edit Goal' : 'Beginning of Year Goal Setting'}
+                </h3>
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={closeModal}
                   className="text-gray-500 hover:text-gray-700 text-2xl"
                 >
                   ×
                 </button>
               </div>
 
-              <form onSubmit={handleAddGoal}>
+              <form onSubmit={handleSaveGoal}>
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -522,7 +592,7 @@ function Goals() {
                 <div className="flex gap-3 mt-6">
                   <button
                     type="button"
-                    onClick={() => setShowAddModal(false)}
+                    onClick={closeModal}
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-[#666666] hover:bg-gray-50"
                   >
                     Cancel
@@ -531,7 +601,7 @@ function Goals() {
                     type="submit"
                     className="flex-1 px-4 py-2 bg-[#2c3e7e] text-white rounded-lg hover:bg-[#1e2a5e]"
                   >
-                    Save Goal
+                    {editingGoalId ? 'Save Changes' : 'Save Goal'}
                   </button>
                 </div>
               </form>
