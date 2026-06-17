@@ -8,6 +8,7 @@ function Staff() {
   const [staff, setStaff] = useState([])
   const [evaluators, setEvaluators] = useState([])
   const [rubrics, setRubrics] = useState([])
+  const [loginStatus, setLoginStatus] = useState({}) // email(lowercased) → { exists, last_sign_in_at }
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showViewModal, setShowViewModal] = useState(false)
@@ -48,6 +49,23 @@ function Staff() {
       setStaff(data)
     }
     setLoading(false)
+    fetchLoginStatus()
+  }
+
+  // Who's actually signed in? (HR rollout helper.) Best-effort: if the
+  // staff-login-status function isn't deployed yet, the column just shows '—'.
+  const fetchLoginStatus = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('staff-login-status')
+      if (error || !data?.statuses) return
+      const map = {}
+      for (const s of data.statuses) {
+        if (s.email) map[s.email.toLowerCase()] = { exists: s.exists, last_sign_in_at: s.last_sign_in_at }
+      }
+      setLoginStatus(map)
+    } catch {
+      // ignore — column degrades to '—'
+    }
   }
 
   const fetchEvaluators = async () => {
@@ -178,6 +196,21 @@ function Staff() {
   const getEvaluatorName = (evaluatorId) => {
     const evaluator = evaluators.find(e => e.id === evaluatorId)
     return evaluator ? evaluator.full_name : 'Not Assigned'
+  }
+
+  // Login/provisioning badge for a staff email. Returns null when status hasn't
+  // loaded (e.g. the staff-login-status function isn't deployed) → renders '—'.
+  const loginBadge = (email) => {
+    const st = email ? loginStatus[email.toLowerCase()] : null
+    if (!st) return null
+    if (st.last_sign_in_at) {
+      const d = new Date(st.last_sign_in_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      return { label: 'Signed in', cls: 'bg-green-100 text-green-800', title: `Last sign-in ${d}` }
+    }
+    if (st.exists) {
+      return { label: 'Not signed in', cls: 'bg-amber-100 text-amber-800', title: 'Account exists but never signed in' }
+    }
+    return { label: 'No account', cls: 'bg-red-100 text-red-700', title: 'No login yet — staff member has not signed in' }
   }
 
   const handleArchiveStaff = async (staffMember) => {
@@ -402,6 +435,9 @@ function Staff() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">
                     Status
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-[#666666] uppercase tracking-wider">
+                    Login
+                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-[#666666] uppercase tracking-wider">
                     Actions
                   </th>
@@ -439,6 +475,13 @@ function Staff() {
                       }`}>
                         {member.is_active !== false ? 'Active' : 'Inactive'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {(() => {
+                        const b = loginBadge(member.email)
+                        if (!b) return <span className="text-xs text-gray-400">—</span>
+                        return <span className={`px-2 py-1 text-xs rounded ${b.cls}`} title={b.title}>{b.label}</span>
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <button
