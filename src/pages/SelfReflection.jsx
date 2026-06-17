@@ -91,7 +91,9 @@ function SelfReflection() {
       .eq('staff_id', profile.id)
       .eq('assessment_type', 'self_reflection')
       .gte('created_at', '2025-07-01')
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     if (existingData) {
       setExistingReflection(existingData)
