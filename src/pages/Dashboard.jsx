@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
+import NeedsAttentionPanel from '../components/NeedsAttentionPanel'
 
 function Dashboard() {
   const { user, profile, signOut, isAdmin, isEvaluator, isStaff } = useAuth()
@@ -367,7 +368,10 @@ function Dashboard() {
             <p className="text-[#666666]">{tenant.name} • School Year 2025-2026</p>
           )}
         </div>
-        
+
+        {/* Needs your attention (#5 notifications wave) */}
+        <NeedsAttentionPanel />
+
         {/* Stats Cards - Different for Admin vs Staff */}
         {(isAdmin || isEvaluator) ? (
           /* Evaluator/Admin Stats */

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabaseClient'
+import { createNotification } from '../services/notificationService'
 
 // ============================================================
 // Comment → required-response loop for one observation (#4).
@@ -12,7 +13,7 @@ import { supabase } from '../supabaseClient'
 const fmt = (d) =>
   d ? new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''
 
-export default function ObservationThread({ observationId, viewer, isObserver, isStaff, onOpenCountChange, observationDelivered = true, onDelivered }) {
+export default function ObservationThread({ observationId, viewer, isObserver, isStaff, staffId, observerId, onOpenCountChange, observationDelivered = true, onDelivered }) {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -96,6 +97,18 @@ export default function ObservationThread({ observationId, viewer, isObserver, i
     })
     if (error) { alert(`Could not post: ${error.message}`); setBusy(false); return }
     await markDeliveredIfNeeded()
+    // Notify the staff member when the observer flags a comment as requiring a response.
+    if (isObserver && requiresResponse && staffId) {
+      createNotification({
+        userId: staffId,
+        tenantId: viewer.tenant_id,
+        type: 'comment_requires_response',
+        title: 'A feedback comment needs your response',
+        message: 'Your evaluator left an observation comment that requires a reply.',
+        relatedEntityType: 'observation',
+        relatedEntityId: observationId,
+      })
+    }
     setBody(''); setRequiresResponse(false)
     await load()
     setBusy(false)
@@ -120,6 +133,18 @@ export default function ObservationThread({ observationId, viewer, isObserver, i
         .from('observation_threads')
         .update({ resolved_at: new Date().toISOString(), resolved_by: viewer.id })
         .eq('id', parent.id)
+    }
+    // Notify the evaluator that the staff member responded.
+    if (isStaff && observerId) {
+      createNotification({
+        userId: observerId,
+        tenantId: viewer.tenant_id,
+        type: 'comment_response',
+        title: 'The staff member responded to your feedback',
+        message: 'A reply was posted on your observation comment thread.',
+        relatedEntityType: 'observation',
+        relatedEntityId: observationId,
+      })
     }
     setReplyTo(null); setReplyBody('')
     await load()

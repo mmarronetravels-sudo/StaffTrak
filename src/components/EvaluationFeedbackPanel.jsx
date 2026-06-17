@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { FEEDBACK_PHASES, phaseLabel } from '../lib/evaluationFeedback'
+import { createNotification } from '../services/notificationService'
 
 // ============================================================
 // EvaluationFeedbackPanel — Phase 4a #5
@@ -105,7 +106,19 @@ export default function EvaluationFeedbackPanel({
     if (meetingId && !row?.meeting_id) patch.meeting_id = meetingId
     if (sign) patch.evaluator_signed_at = new Date().toISOString()
     const saved = await persist(patch)
-    if (saved && sign) setEditingEval(false)
+    if (saved && sign) {
+      setEditingEval(false)
+      // Notify the staff member that feedback was delivered.
+      createNotification({
+        userId: cycle.staff_id,
+        tenantId: cycle.tenant_id,
+        type: 'feedback_delivered',
+        title: `${meta.label || phaseLabel(phase)} feedback delivered`,
+        message: 'Your evaluator delivered feedback — review and acknowledge it.',
+        relatedEntityType: 'evaluation_feedback',
+        relatedEntityId: saved.id,
+      })
+    }
   }
 
   const unsignEvaluator = async () => {
@@ -116,7 +129,19 @@ export default function EvaluationFeedbackPanel({
   const saveStaff = async (ack) => {
     const patch = { staff_response: staffText }
     if (ack) patch.staff_acknowledged_at = new Date().toISOString()
-    await persist(patch)
+    const saved = await persist(patch)
+    if (saved && ack && cycle.evaluator_id) {
+      // Notify the evaluator that the staff member acknowledged.
+      createNotification({
+        userId: cycle.evaluator_id,
+        tenantId: cycle.tenant_id,
+        type: 'feedback_acknowledged',
+        title: `${meta.label || phaseLabel(phase)} feedback acknowledged`,
+        message: `${profile?.full_name || 'The staff member'} acknowledged your ${meta.label || phaseLabel(phase)} feedback.`,
+        relatedEntityType: 'evaluation_feedback',
+        relatedEntityId: saved.id,
+      })
+    }
   }
 
   const delivered = !!row?.evaluator_signed_at

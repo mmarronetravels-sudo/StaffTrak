@@ -774,6 +774,8 @@ function ObservationSession() {
                     viewer={profile}
                     isObserver={observation?.observer_id === profile.id}
                     isStaff={observation?.staff_id === profile.id}
+                    staffId={observation?.staff_id}
+                    observerId={observation?.observer_id}
                     observationDelivered={!!observation?.feedback_delivered_at}
                     onDelivered={(ts) => setObservation((o) => ({ ...o, feedback_delivered_at: ts }))}
                   />

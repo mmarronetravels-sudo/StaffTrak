@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../supabaseClient'
+import NotificationBell from './NotificationBell'
 
 const C = {
   navy: '#2c3e7e',
@@ -257,8 +258,11 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* ── Right side: User Avatar Menu + Mobile Hamburger ── */}
+          {/* ── Right side: Notifications + User Avatar Menu + Mobile Hamburger ── */}
           <div className="flex items-center gap-2">
+
+            {/* Notification bell */}
+            <NotificationBell />
 
             {/* User Avatar Dropdown */}
             <div className="hidden lg:block relative">
