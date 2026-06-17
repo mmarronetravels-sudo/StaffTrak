@@ -7,6 +7,7 @@ import { SummativePDFDownload } from '../components/SummativePDF'
 import Navbar from '../components/Navbar'
 import { obsTypeLabel } from '../lib/observationTypes'
 import { fetchScoredIndicatorRatings, fetchEvidenceTagsForStaff } from '../lib/summativeRollup'
+import GoalReviewPanel from '../components/GoalReviewPanel'
 
 const RATING_OPTIONS = ['Highly Effective', 'Effective', 'Developing', 'Needs Improvement']
 const ratingTextColor = (rating) =>
@@ -28,6 +29,7 @@ function SummativeEvaluation() {
   const [domains, setDomains] = useState([])
   const [standards, setStandards] = useState([])
   const [goals, setGoals] = useState([])
+  const [cycle, setCycle] = useState(null)
   const [observations, setObservations] = useState([])
   const [selfReflection, setSelfReflection] = useState(null)
   
@@ -199,6 +201,18 @@ function SummativeEvaluation() {
       .order('created_at')
 
     if (goalsData) setGoals(goalsData)
+
+    // Fetch the staff member's active cycle so final goal reviews (#6) can be
+    // shown read-only beside each goal.
+    const { data: cycleData } = await supabase
+      .from('evaluation_cycles')
+      .select('id, tenant_id, staff_id, evaluator_id')
+      .eq('staff_id', staffId)
+      .order('school_year', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    setCycle(cycleData || null)
 
     // Fetch observations
     const { data: obsData } = await supabase
@@ -520,6 +534,18 @@ function SummativeEvaluation() {
                           )}
                         </div>
                         <p className="text-xs text-[#666666] capitalize">{goal.goal_type}</p>
+                        {/* Staff-authored final progress carried forward (#6) */}
+                        {cycle && (
+                          <div className="mt-2">
+                            <GoalReviewPanel
+                              goal={goal}
+                              cycle={cycle}
+                              phase="final"
+                              profile={profile}
+                              readOnly
+                            />
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
