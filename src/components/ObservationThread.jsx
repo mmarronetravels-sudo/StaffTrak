@@ -107,6 +107,7 @@ export default function ObservationThread({ observationId, viewer, isObserver, i
         message: 'Your evaluator left an observation comment that requires a reply.',
         relatedEntityType: 'observation',
         relatedEntityId: observationId,
+        sendEmail: true,
       })
     }
     setBody(''); setRequiresResponse(false)
@@ -144,6 +145,7 @@ export default function ObservationThread({ observationId, viewer, isObserver, i
         message: 'A reply was posted on your observation comment thread.',
         relatedEntityType: 'observation',
         relatedEntityId: observationId,
+        sendEmail: true,
       })
     }
     setReplyTo(null); setReplyBody('')

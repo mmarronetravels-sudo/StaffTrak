@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient'
 
 const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`
 
-async function sendEmail(to, template, data) {
+export async function sendEmail(to, template, data) {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     
@@ -41,3 +41,8 @@ export const notifyObservationScheduled = ({ staffEmail, staffName, evaluatorNam
 // Evaluation notifications
 export const notifyEvaluationReady = ({ staffEmail, staffName, evaluatorName, schoolYear }) =>
   sendEmail(staffEmail, 'evaluation_ready', { staffName, evaluatorName, schoolYear })
+
+// Generic notification email — reuses an in-app notification's title/message.
+// Used by the #5 notifications wave so any event can email without a new template.
+export const notifyGeneric = ({ to, subject, message, recipientName, link }) =>
+  sendEmail(to, 'generic', { subject, message, recipientName, link })

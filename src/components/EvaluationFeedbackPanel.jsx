@@ -117,6 +117,7 @@ export default function EvaluationFeedbackPanel({
         message: 'Your evaluator delivered feedback — review and acknowledge it.',
         relatedEntityType: 'evaluation_feedback',
         relatedEntityId: saved.id,
+        sendEmail: true,
       })
     }
   }
@@ -140,6 +141,7 @@ export default function EvaluationFeedbackPanel({
         message: `${profile?.full_name || 'The staff member'} acknowledged your ${meta.label || phaseLabel(phase)} feedback.`,
         relatedEntityType: 'evaluation_feedback',
         relatedEntityId: saved.id,
+        sendEmail: true,
       })
     }
   }
