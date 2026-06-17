@@ -79,7 +79,7 @@ function MeetingSession() {
     // Fetch self-reflection
     const { data: reflectionData } = await supabase
       .from('self_assessments')
-      .select('id, rubric_id, domain_scores, content, submitted_at, created_at, staff_signed_at, evaluator_signed_at')
+      .select('id, domain_scores, content, submitted_at, created_at, staff_signed_at, evaluator_signed_at')
       .eq('staff_id', staffId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -88,12 +88,14 @@ function MeetingSession() {
     if (reflectionData) {
       setSelfReflection(reflectionData)
       
-      // Fetch rubric data for displaying standards
-      if (reflectionData.rubric_id) {
+      // Fetch rubric data for displaying standards. The rubric id is stored
+      // inside the self-assessment's content JSON, not as a table column.
+      const reflectionRubricId = reflectionData.content?.rubric_id
+      if (reflectionRubricId) {
         const { data: domains } = await supabase
           .from('rubric_domains')
           .select('id, name, sort_order')
-          .eq('rubric_id', reflectionData.rubric_id)
+          .eq('rubric_id', reflectionRubricId)
           .order('sort_order')
 
         if (domains) {

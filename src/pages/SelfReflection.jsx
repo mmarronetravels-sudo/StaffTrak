@@ -87,7 +87,7 @@ function SelfReflection() {
 
     const { data: existingData } = await supabase
       .from('self_assessments')
-      .select('id, rubric_id, domain_scores, content, submitted_at, created_at, staff_signed_at, evaluator_signed_at')
+      .select('id, domain_scores, content, submitted_at, created_at, staff_signed_at, evaluator_signed_at')
       .eq('staff_id', profile.id)
       .eq('assessment_type', 'self_reflection')
       .gte('created_at', '2025-07-01')
