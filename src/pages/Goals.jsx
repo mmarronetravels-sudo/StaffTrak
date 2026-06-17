@@ -53,11 +53,13 @@ function Goals() {
   const fetchGoals = async () => {
     const { data, error } = await supabase
       .from('goals')
-      .select('id, goal_type, title, description, content_standards, assessments, context_students, baseline_data, target_data, rationale, strategies, professional_learning, status, evaluator_feedback, mid_year_reflection, end_year_reflection, end_year_results, created_at, staff_signed_at, evaluator_signed_at')
+      .select('id, goal_type, title, description, content_standards, assessments, context_students, baseline_data, target_data, rationale, strategies, professional_learning, status, evaluator_feedback, created_at, staff_signed_at, evaluator_signed_at')
       .eq('staff_id', profile.id)
       .order('created_at', { ascending: false })
 
-    if (!error) {
+    if (error) {
+      console.error('Failed to load goals:', error)
+    } else {
       setGoals(data)
     }
     setLoading(false)
