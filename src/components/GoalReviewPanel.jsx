@@ -7,6 +7,7 @@ import {
   reviewStatusLabel,
   reviewStatusBadge,
 } from '../lib/goalReviews'
+import { createNotification } from '../services/notificationService'
 
 // ============================================================
 // GoalReviewPanel — Phase 4b #6
@@ -106,13 +107,27 @@ export default function GoalReviewPanel({
   const saveDraft = () =>
     persist({ progress_note: note, status: status || null, entry_state: 'draft' })
 
-  const submit = () =>
-    persist({
+  const submit = async () => {
+    const saved = await persist({
       progress_note: note,
       status: status || null,
       entry_state: 'submitted',
       submitted_at: new Date().toISOString(),
     })
+    if (saved && cycle.evaluator_id) {
+      // Notify the evaluator that the staff member submitted goal progress.
+      createNotification({
+        userId: cycle.evaluator_id,
+        tenantId: cycle.tenant_id,
+        type: 'goal_review_submitted',
+        title: 'Goal progress submitted',
+        message: `${profile?.full_name || 'A staff member'} submitted ${meta.label || reviewPhaseLabel(phase)} goal progress.`,
+        relatedEntityType: 'goal',
+        relatedEntityId: goal.id,
+        sendEmail: true,
+      })
+    }
+  }
 
   const reopen = () => persist({ entry_state: 'draft', submitted_at: null })
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { createNotification } from '../services/notificationService'
 import Navbar from '../components/Navbar'
 
 function Meetings() {
@@ -78,7 +79,8 @@ function Meetings() {
       `)
 
     if (!error && data) {
-      setMeetings([...meetings, data[0]])
+      const m = data[0]
+      setMeetings([...meetings, m])
       setShowScheduleModal(false)
       setNewMeeting({
         staff_id: '',
@@ -86,6 +88,18 @@ function Meetings() {
         scheduled_at: '',
         location: '',
         agenda: ''
+      })
+
+      // Notify the staff member that a meeting was scheduled (in-app + email).
+      createNotification({
+        userId: m.staff_id,
+        tenantId: profile.tenant_id,
+        type: 'meeting_scheduled',
+        title: 'A meeting has been scheduled',
+        message: `${profile.full_name || 'Your evaluator'} scheduled a ${getMeetingTypeLabel(m.meeting_type)} for ${new Date(m.scheduled_at).toLocaleDateString()}.`,
+        relatedEntityType: 'meeting',
+        relatedEntityId: m.id,
+        sendEmail: true,
       })
     }
   }

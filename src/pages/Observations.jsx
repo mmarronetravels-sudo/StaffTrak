@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { notifyObservationScheduled } from '../services/emailService'
+import { createNotification } from '../services/notificationService'
 import Navbar from '../components/Navbar'
 import {
   OBSERVATION_TYPES,
@@ -107,9 +108,10 @@ function Observations() {
         subject_topic: ''
       })
 
-      // Send email notification to staff
+      const obsDate = new Date(obs.scheduled_at)
+
+      // Send email notification to staff (dedicated template)
       if (obs.staff?.email) {
-        const obsDate = new Date(obs.scheduled_at)
         await notifyObservationScheduled({
           staffEmail: obs.staff.email,
           staffName: obs.staff.full_name,
@@ -119,6 +121,17 @@ function Observations() {
           type: obsTypeLabel(obs.observation_type)
         })
       }
+
+      // In-app notification to staff (email already sent above, so no dup).
+      createNotification({
+        userId: obs.staff_id,
+        tenantId: profile.tenant_id,
+        type: 'observation_scheduled',
+        title: 'An observation has been scheduled',
+        message: `${profile.full_name || 'Your evaluator'} scheduled a ${obsTypeLabel(obs.observation_type)} observation for ${obsDate.toLocaleDateString()}.`,
+        relatedEntityType: 'observation',
+        relatedEntityId: obs.id,
+      })
     }
   }
 

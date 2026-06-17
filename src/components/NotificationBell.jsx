@@ -44,6 +44,11 @@ export default function NotificationBell() {
       case 'feedback_acknowledged': return '/checklists'
       case 'comment_requires_response': return '/my-observations'
       case 'comment_response': return '/observations'
+      case 'observation_scheduled': return '/my-observations'
+      case 'meeting_scheduled': return '/my-meetings'
+      case 'goal_review_submitted': return '/checklists'
+      case 'required_response_reminder':
+        return isEvaluator ? '/observations' : '/my-observations'
       default:
         if (n.related_entity_type === 'observation') {
           return isEvaluator ? '/observations' : '/my-observations'
