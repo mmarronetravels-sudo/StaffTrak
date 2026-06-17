@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import EvaluationFeedbackPanel from './EvaluationFeedbackPanel'
 import { FEEDBACK_PHASE_ORDER } from '../lib/evaluationFeedback'
+import ActionItemsPanel from './ActionItemsPanel'
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -218,6 +219,20 @@ export default function EvaluationChecklist({ cycle, tasks, profile, isAdmin, is
               isHR={isHR}
             />
           ))}
+        </div>
+      </div>
+
+      {/* ── Growth next-steps (#13) ── */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-5 border-b border-gray-100">
+          <h3 className="font-semibold text-[#2c3e7e]">Growth Next-Steps</h3>
+          <p className="text-sm text-[#666666] mt-0.5">
+            Action items from observations and feedback, linked to goals and professional learning,
+            tracked to done.
+          </p>
+        </div>
+        <div className="p-5">
+          <ActionItemsPanel cycle={cycle} profile={profile} isAdmin={isAdmin} isHR={isHR} />
         </div>
       </div>
     </div>

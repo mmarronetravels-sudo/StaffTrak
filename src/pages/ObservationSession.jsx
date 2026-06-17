@@ -6,14 +6,16 @@ import { obsTypeLabel } from '../lib/observationTypes'
 import { openEvidenceFile } from '../lib/evidenceStorage'
 import ObservationThread from '../components/ObservationThread'
 import { feedbackTurnaround } from '../lib/feedbackTiming'
+import ActionItemsPanel from '../components/ActionItemsPanel'
 
 function ObservationSession() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { profile } = useAuth()
+  const { profile, isAdmin, isHR } = useAuth()
   const notesEndRef = useRef(null)
 
   const [observation, setObservation] = useState(null)
+  const [cycle, setCycle] = useState(null)
   const [notes, setNotes] = useState([])
   const [standards, setStandards] = useState([])
   const [domains, setDomains] = useState([])
@@ -100,6 +102,18 @@ function ObservationSession() {
     setFeedback(obsData.feedback || '')
     setNextSteps(obsData.next_steps || '')
     setShareNotes(obsData.share_notes_with_staff !== false)
+
+    // Resolve the staff member's current cycle so growth next-steps (#13) can
+    // attach to it and link to their goals.
+    const { data: cycleData } = await supabase
+      .from('evaluation_cycles')
+      .select('id, tenant_id, staff_id, evaluator_id')
+      .eq('staff_id', obsData.staff_id)
+      .order('school_year', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    setCycle(cycleData || null)
 
     // Fetch notes for this observation
     const { data: notesData } = await supabase
@@ -919,6 +933,23 @@ function ObservationSession() {
                     </div>
                   )}
                 </div>
+
+                {/* Growth next-steps (#13) generated from this observation */}
+                {cycle && (
+                  <div className="mt-4 border-t border-gray-100 pt-3">
+                    <h4 className="text-sm font-semibold text-[#2c3e7e] mb-2">Growth Next-Steps</h4>
+                    <div className="max-h-64 overflow-y-auto">
+                      <ActionItemsPanel
+                        cycle={cycle}
+                        profile={profile}
+                        isAdmin={isAdmin}
+                        isHR={isHR}
+                        observationId={observation.id}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-4 text-center">
                   <span className="text-sm text-green-600">✓ Observation completed</span>
                   {observation.ended_at && observation.started_at && (
