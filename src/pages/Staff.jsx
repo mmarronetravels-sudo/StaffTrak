@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { rubricNameFor } from '../lib/rubricRouting'
 
 function Staff() {
   const { profile, signOut } = useAuth()
@@ -896,13 +897,16 @@ function Staff() {
                       onChange={(e) => setSelectedStaff({...selectedStaff, assigned_rubric_id: e.target.value || null})}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#477fc1]"
                     >
-                      <option value="">— Select Rubric —</option>
+                      <option value="">— Auto by position: {rubricNameFor(selectedStaff)} —</option>
                       {rubrics.map(r => (
                         <option key={r.id} value={r.id}>
                           {r.name} ({r.staff_type})
                         </option>
                       ))}
                     </select>
+                    <p className="text-xs text-[#666666] mt-1">
+                      Leave blank to auto-select by position type. Pick a rubric here to override.
+                    </p>
                   </div>
 
                   <div>
