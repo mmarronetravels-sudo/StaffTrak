@@ -4,6 +4,8 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import EvaluationFeedbackPanel from '../components/EvaluationFeedbackPanel'
 import { phaseForMeetingType } from '../lib/evaluationFeedback'
+import GoalReviewPanel from '../components/GoalReviewPanel'
+import { reviewPhaseForMeetingType } from '../lib/goalReviews'
 
 function MeetingSession() {
   const { id } = useParams()
@@ -273,6 +275,9 @@ function MeetingSession() {
   // feedback panel's acknowledgment is the single sign-off for the meeting.
   const feedbackPhase = phaseForMeetingType(meeting.meeting_type)
   const showFeedbackPanel = !!(cycle && feedbackPhase)
+  // Goal progress carry-forward (#6): the staff-authored review for this
+  // meeting's phase, shown read-only alongside each goal.
+  const goalReviewPhase = reviewPhaseForMeetingType(meeting.meeting_type)
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -438,20 +443,19 @@ function MeetingSession() {
                             <span className="font-medium">Target:</span> {goal.target_data}
                           </p>
                         )}
-                        {/* Mid-year/End-year progress */}
-                        {(meeting.meeting_type === 'mid_year_review' || meeting.meeting_type === 'end_year_review') && (
-                          <>
-                            {goal.mid_year_progress && (
-                              <p className="text-xs text-[#666666] mt-1">
-                                <span className="font-medium">Mid-Year Progress:</span> {goal.mid_year_progress}
-                              </p>
-                            )}
-                            {meeting.meeting_type === 'end_year_review' && goal.end_year_progress && (
-                              <p className="text-xs text-[#666666] mt-1">
-                                <span className="font-medium">End-Year Progress:</span> {goal.end_year_progress}
-                              </p>
-                            )}
-                          </>
+                        {/* Goal progress carry-forward (#6) — staff-authored, read-only here */}
+                        {cycle && goalReviewPhase && (
+                          <div className="mt-2">
+                            <GoalReviewPanel
+                              goal={goal}
+                              cycle={cycle}
+                              phase={goalReviewPhase}
+                              profile={profile}
+                              isAdmin={isAdmin}
+                              isHR={isHR}
+                              readOnly
+                            />
+                          </div>
                         )}
                       </div>
                     ))}

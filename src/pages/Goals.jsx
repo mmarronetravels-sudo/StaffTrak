@@ -3,10 +3,13 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { notifyGoalSubmitted } from '../services/emailService'
 import Navbar from '../components/Navbar'
+import GoalReviewPanel from '../components/GoalReviewPanel'
+import { REVIEW_PHASE_ORDER } from '../lib/goalReviews'
 
 function Goals() {
-  const { user, profile, signOut } = useAuth()
+  const { user, profile, signOut, isAdmin, isHR } = useAuth()
   const [goals, setGoals] = useState([])
+  const [cycle, setCycle] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [expandedGoal, setExpandedGoal] = useState(null)
@@ -30,6 +33,21 @@ function Goals() {
     }
   }, [profile])
 
+  // The staff member's current evaluation cycle — needed so goal-progress
+  // reviews (#6) can attach to it. Called from fetchGoals (not the effect) to
+  // avoid referencing a later-declared function inside the hook.
+  const fetchCycle = async () => {
+    const { data } = await supabase
+      .from('evaluation_cycles')
+      .select('id, tenant_id, staff_id, evaluator_id')
+      .eq('staff_id', profile.id)
+      .order('school_year', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    setCycle(data || null)
+  }
+
   const fetchGoals = async () => {
     const { data, error } = await supabase
       .from('goals')
@@ -41,6 +59,7 @@ function Goals() {
       setGoals(data)
     }
     setLoading(false)
+    fetchCycle()
   }
 
   const handleAddGoal = async (e) => {
@@ -281,6 +300,26 @@ function Goals() {
                           <p className="text-sm text-[#666666] bg-gray-50 p-3 rounded">{goal.professional_learning}</p>
                         </div>
                       )}
+                      {/* Goal progress carry-forward (#6): Mid-Year + Final */}
+                      {cycle && goal.status !== 'draft' && (
+                        <div className="pt-2">
+                          <h4 className="text-sm font-semibold text-[#2c3e7e] mb-2">Goal Progress</h4>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {REVIEW_PHASE_ORDER.map((phase) => (
+                              <GoalReviewPanel
+                                key={phase}
+                                goal={goal}
+                                cycle={cycle}
+                                phase={phase}
+                                profile={profile}
+                                isAdmin={isAdmin}
+                                isHR={isHR}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Evaluator Feedback (if returned for revision) */}
 {goal.evaluator_feedback && goal.status === 'draft' && (
   <div className="bg-orange-50 border border-orange-200 p-3 rounded">
