@@ -112,6 +112,7 @@ export default function Navbar() {
     { to: '/staff', label: 'Staff Directory', icon: '👥', adminOnly: false },
     { to: '/leave-tracker', label: 'Leave Tracker', icon: '🏥' },
     { to: '/ode-staff-position', label: 'ODE Position File', icon: '📁' },
+    { to: '/settings', label: 'Settings', icon: '⚙️' },
   ]
 
   // ── Dropdown component ────────────────────────────────────────

@@ -522,7 +522,7 @@ function Staff() {
                   onClick={() => { setShowAddModal(false); resetNewStaff(); }}
                   className="text-gray-500 hover:text-gray-700 text-2xl"
                 >
-                  Ã—
+                  &times;
                 </button>
               </div>
 
@@ -667,7 +667,7 @@ function Staff() {
                   onClick={() => { setShowViewModal(false); setSelectedStaff(null); }}
                   className="text-gray-500 hover:text-gray-700 text-2xl"
                 >
-                  Ã—
+                  &times;
                 </button>
               </div>
 
@@ -829,7 +829,7 @@ function Staff() {
                   onClick={() => { setShowEditModal(false); setSelectedStaff(null); }}
                   className="text-gray-500 hover:text-gray-700 text-2xl"
                 >
-                  Ã—
+                  &times;
                 </button>
               </div>
 

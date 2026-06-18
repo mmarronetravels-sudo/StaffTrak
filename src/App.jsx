@@ -22,6 +22,7 @@ import Reports from './pages/Reports'
 import StaffImport from './pages/StaffImport'
 import AuthCallback from './pages/AuthCallback'
 import SetPassword from './pages/SetPassword'
+import Settings from './pages/Settings'
 import MyChecklist from './pages/MyChecklist'
 import Checklists from './pages/Checklists'
 import Calendar from './pages/Calendar'
@@ -277,6 +278,16 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['district_admin', 'hr']}>
                 <LeaveTracker />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Settings - Admin + HR (tenant configuration) */}
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'hr']}>
+                <Settings />
               </ProtectedRoute>
             }
           />

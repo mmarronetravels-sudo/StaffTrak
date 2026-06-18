@@ -50,6 +50,10 @@ export default function StaffDetail() {
   const [goals, setGoals] = useState([])
   const [goalsLoading, setGoalsLoading] = useState(true)
   const [expandedGoalId, setExpandedGoalId] = useState(null)
+  const [account, setAccount] = useState(null) // {status:'active'|'pending'|'none', last_sign_in_at}
+  const [accountLoading, setAccountLoading] = useState(true)
+  const [inviting, setInviting] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
@@ -60,6 +64,12 @@ export default function StaffDetail() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // Load account status once we know the staff member's email (avoids a race
+  // with the profile fetch).
+  useEffect(() => {
+    if (staff?.email) loadAccount(staff.email)
+  }, [staff?.email])
 
   const load = async () => {
     setLoading(true)
@@ -85,6 +95,58 @@ export default function StaffDetail() {
     if (error) console.error('goals load error', error)
     setGoals(data || [])
     setGoalsLoading(false)
+  }
+
+  const canInvite = !!profile && (profile.role === 'district_admin' || isHR)
+
+  // Account-activation status comes from the staff-login-status function
+  // (service-role; the client can't read auth.users). We match on email.
+  const loadAccount = async (email) => {
+    setAccountLoading(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('staff-login-status')
+      if (error) throw error
+      const mine = (data?.statuses || []).find(
+        (x) => (x.email || '').toLowerCase() === (email || '').toLowerCase()
+      )
+      if (!mine || !mine.exists) setAccount({ status: 'none' })
+      else if (mine.last_sign_in_at) setAccount({ status: 'active', last_sign_in_at: mine.last_sign_in_at })
+      else setAccount({ status: 'pending' })
+    } catch {
+      setAccount(null) // unknown (e.g. caller lacks permission)
+    }
+    setAccountLoading(false)
+  }
+
+  const handleInvite = async () => {
+    setInviting(true)
+    setInviteMsg(null)
+    const { data, error } = await supabase.functions.invoke('invite-staff', {
+      body: { staffId: id, redirectTo: `${window.location.origin}/set-password` },
+    })
+    setInviting(false)
+    if (error) {
+      setInviteMsg({ type: 'err', text: error.message || 'Invite failed.' })
+      return
+    }
+    if (data?.status === 'invited') setInviteMsg({ type: 'ok', text: 'Invite email sent.' })
+    else if (data?.status === 'pending') setInviteMsg({ type: 'ok', text: 'Already invited — pending sign-in.' })
+    else if (data?.status === 'active') setInviteMsg({ type: 'ok', text: 'This account is already active.' })
+    else if (data?.error) setInviteMsg({ type: 'err', text: data.error })
+    if (staff?.email) loadAccount(staff.email)
+  }
+
+  const handleResend = async () => {
+    if (!staff?.email) return
+    setInviting(true)
+    setInviteMsg(null)
+    const { error } = await supabase.auth.resetPasswordForEmail(staff.email, {
+      redirectTo: `${window.location.origin}/set-password`,
+    })
+    setInviting(false)
+    setInviteMsg(
+      error ? { type: 'err', text: error.message } : { type: 'ok', text: 'Set-password email re-sent.' }
+    )
   }
 
   // Whoever is viewing may sign the evaluator side if they are this staff
@@ -166,6 +228,59 @@ export default function StaffDetail() {
                   <a href={`/meetings?staff=${staff.id}`} className="px-3 py-1 bg-gray-100 text-[#666666] rounded hover:bg-gray-200 text-sm">View Meetings</a>
                 </div>
               </div>
+            </div>
+
+            {/* Account access (invite / activation status) */}
+            <div className="bg-white rounded-lg shadow p-6 mt-6">
+              <h5 className="font-semibold text-[#2c3e7e] mb-3">Account access</h5>
+              {accountLoading ? (
+                <p className="text-sm text-[#999999]">Checking…</p>
+              ) : account === null ? (
+                <p className="text-sm text-[#999999]">Account status unavailable.</p>
+              ) : (
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="text-sm">
+                    {account.status === 'active' && (
+                      <span className="text-green-700 font-medium">
+                        ✓ Active{account.last_sign_in_at ? ` · last sign-in ${fmtShort(account.last_sign_in_at)}` : ''}
+                      </span>
+                    )}
+                    {account.status === 'pending' && (
+                      <span className="text-amber-700 font-medium">Invited — awaiting first sign-in</span>
+                    )}
+                    {account.status === 'none' && (
+                      <span className="text-[#999999]">No account yet — staff can use Google sign-in, or send a password invite.</span>
+                    )}
+                  </div>
+                  {canInvite && (
+                    <div className="flex gap-2">
+                      {account.status === 'none' && (
+                        <button
+                          onClick={handleInvite}
+                          disabled={inviting}
+                          className="px-3 py-1.5 bg-[#2c3e7e] text-white rounded-lg text-sm hover:bg-[#1e2d5b] disabled:opacity-50"
+                        >
+                          {inviting ? 'Sending…' : 'Send invite'}
+                        </button>
+                      )}
+                      {account.status === 'pending' && (
+                        <button
+                          onClick={handleResend}
+                          disabled={inviting}
+                          className="px-3 py-1.5 border border-[#2c3e7e] text-[#2c3e7e] rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50"
+                        >
+                          {inviting ? 'Sending…' : 'Resend invite'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {inviteMsg && (
+                <p className={`text-sm mt-3 ${inviteMsg.type === 'err' ? 'text-red-600' : 'text-green-700'}`}>
+                  {inviteMsg.text}
+                </p>
+              )}
             </div>
 
             {/* Goals — all statuses (read-only) */}
