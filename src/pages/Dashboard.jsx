@@ -88,11 +88,12 @@ function Dashboard() {
       // Self-reflection
       supabase
         .from('self_assessments')
-        .select('id, status, created_at')
+        .select('id, submitted_at, created_at')
         .eq('staff_id', profile.id)
+        .eq('assessment_type', 'self_reflection')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single(),
+        .maybeSingle(),
       
       // Evaluator info
       profile.evaluator_id ? supabase

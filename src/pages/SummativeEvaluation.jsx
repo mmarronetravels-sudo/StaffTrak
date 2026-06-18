@@ -226,11 +226,12 @@ function SummativeEvaluation() {
     // Fetch self-reflection
     const { data: reflectionData } = await supabase
       .from('self_assessments')
-      .select('id, overall_score, created_at')
+      .select('id, domain_scores, created_at')
       .eq('staff_id', staffId)
+      .eq('assessment_type', 'self_reflection')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
     
     if (reflectionData) setSelfReflection(reflectionData)
   }
@@ -594,7 +595,10 @@ function SummativeEvaluation() {
                 <div className="p-4 text-center">
                   <p className="text-sm text-[#666666]">Self-Rating Average</p>
                   <p className="text-2xl font-bold text-[#2c3e7e]">
-                    {selfReflection.overall_score?.toFixed(1) || 'N/A'}
+                    {(() => {
+                      const vals = Object.values(selfReflection.domain_scores || {}).filter(v => typeof v === 'number')
+                      return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : 'N/A'
+                    })()}
                   </p>
                 </div>
               </div>
