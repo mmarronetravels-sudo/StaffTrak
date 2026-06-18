@@ -16,6 +16,7 @@ function Dashboard() {
     pendingSignatures: 0
   })
   const [upcomingObservations, setUpcomingObservations] = useState([])
+  const [myStaff, setMyStaff] = useState([])
   const [loading, setLoading] = useState(true)
   
   // Staff-specific data
@@ -228,9 +229,12 @@ function Dashboard() {
       // Evaluator/Admin stats
       const { data: assignedStaff } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, full_name, position_type, staff_type, email')
         .eq('evaluator_id', profile.id)
         .eq('is_active', true)
+        .order('full_name')
+
+      setMyStaff(assignedStaff || [])
 
       const { data: observations } = await supabase
         .from('observations')
@@ -377,18 +381,18 @@ function Dashboard() {
         {(isAdmin || isEvaluator) ? (
           /* Evaluator/Admin Stats */
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-lg shadow border-l-4 border-[#2c3e7e]">
+            <a href="#my-staff" className="bg-white p-6 rounded-lg shadow border-l-4 border-[#2c3e7e] hover:shadow-md transition-shadow">
               <p className="text-[#666666] text-sm">Staff Assigned</p>
               <p className="text-3xl font-bold text-[#2c3e7e]">{stats.staffAssigned}</p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow border-l-4 border-[#477fc1]">
+            </a>
+            <a href="/observations" className="bg-white p-6 rounded-lg shadow border-l-4 border-[#477fc1] hover:shadow-md transition-shadow">
               <p className="text-[#666666] text-sm">Observations Pending</p>
               <p className="text-3xl font-bold text-[#2c3e7e]">{stats.observationsDue}</p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow border-l-4 border-[#f3843e]">
+            </a>
+            <a href="/goal-approvals" className="bg-white p-6 rounded-lg shadow border-l-4 border-[#f3843e] hover:shadow-md transition-shadow">
               <p className="text-[#666666] text-sm">Goals to Review</p>
               <p className="text-3xl font-bold text-[#f3843e]">{stats.pendingGoals}</p>
-            </div>
+            </a>
             <a href="/reports" className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500 hover:shadow-md transition-shadow">
               <p className="text-[#666666] text-sm">View Reports</p>
               <p className="text-lg font-bold text-green-600">📊 Analytics</p>
@@ -576,6 +580,34 @@ function Dashboard() {
                   ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* My Staff (evaluator/admin) */}
+        {(isAdmin || isEvaluator) && (
+          <div id="my-staff" className="bg-white p-6 rounded-lg shadow mb-8 scroll-mt-24">
+            <h3 className="text-lg font-semibold text-[#2c3e7e] mb-4">My Staff</h3>
+            {myStaff.length === 0 ? (
+              <p className="text-sm text-[#999999]">No staff are currently assigned to you.</p>
+            ) : (
+              <div className="space-y-2">
+                {myStaff.map(s => (
+                  <a
+                    key={s.id}
+                    href={`/staff/${s.id}`}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium text-[#2c3e7e]">{s.full_name}</p>
+                      <p className="text-sm text-[#666666] capitalize">
+                        {s.position_type?.replace(/_/g, ' ') || (s.staff_type === 'licensed' ? 'Licensed staff' : 'Classified staff')}
+                      </p>
+                    </div>
+                    <span className="text-[#477fc1] text-sm">View →</span>
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

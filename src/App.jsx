@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Staff from './pages/Staff'
+import StaffDetail from './pages/StaffDetail'
 import Rubrics from './pages/Rubrics'
 import Goals from './pages/Goals'
 import GoalApprovals from './pages/GoalApprovals'
@@ -147,13 +148,22 @@ function App() {
             } 
           />
 
-          <Route 
-            path="/staff/import" 
+          <Route
+            path="/staff/import"
             element={
               <ProtectedRoute allowedRoles={['district_admin']}>
                 <StaffImport />
               </ProtectedRoute>
-            } 
+            }
+          />
+
+          <Route
+            path="/staff/:id"
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'school_admin', 'hr']} allowEvaluators>
+                <StaffDetail />
+              </ProtectedRoute>
+            }
           />
 
           <Route 

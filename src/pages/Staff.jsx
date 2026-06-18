@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { rubricNameFor } from '../lib/rubricRouting'
-import AnecdotalNotesPanel from '../components/AnecdotalNotesPanel'
 
 function Staff() {
   const { profile, signOut } = useAuth()
@@ -769,15 +768,15 @@ function Staff() {
                   </div>
                 </div>
 
-                {/* Anecdotal Notes (private evaluator log) */}
-                <AnecdotalNotesPanel
-                  staffId={selectedStaff.id}
-                  staffName={selectedStaff.full_name}
-                  staffEvaluatorId={selectedStaff.evaluator_id}
-                  profile={profile}
-                  isAdmin={profile?.role === 'district_admin' || profile?.role === 'school_admin'}
-                  isHR={profile?.role === 'hr'}
-                />
+                {/* Full profile (anecdotal notes + detail live here) */}
+                <div className="pt-4 border-t">
+                  <a
+                    href={`/staff/${selectedStaff.id}`}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-[#477fc1] hover:underline"
+                  >
+                    Open full profile &amp; anecdotal notes →
+                  </a>
+                </div>
               </div>
 
               <div className="flex gap-3 mt-6">
