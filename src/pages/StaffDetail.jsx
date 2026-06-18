@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import AnecdotalNotesPanel from '../components/AnecdotalNotesPanel'
+import SignOffBlock from '../components/SignOffBlock'
 
 // ============================================================
 // StaffDetail — per-staff hub (/staff/:id)
@@ -48,6 +49,7 @@ export default function StaffDetail() {
   const [staff, setStaff] = useState(null)
   const [goals, setGoals] = useState([])
   const [goalsLoading, setGoalsLoading] = useState(true)
+  const [expandedGoalId, setExpandedGoalId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
@@ -77,13 +79,19 @@ export default function StaffDetail() {
     setGoalsLoading(true)
     const { data, error } = await supabase
       .from('goals')
-      .select('id, title, goal_type, status, final_score, created_at, approved_at')
+      .select('id, title, goal_type, status, final_score, created_at, approved_at, staff_signed_at, evaluator_signed_at')
       .eq('staff_id', id)
       .order('created_at', { ascending: false })
     if (error) console.error('goals load error', error)
     setGoals(data || [])
     setGoalsLoading(false)
   }
+
+  // Whoever is viewing may sign the evaluator side if they are this staff
+  // member's evaluator, or HR/admin. The sign_goal RPC (029) re-checks this
+  // server-side, so this only governs whether the control is shown.
+  const canEvaluatorSign =
+    !!profile && (isAdmin || isHR || (staff && staff.evaluator_id === profile.id))
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -172,19 +180,57 @@ export default function StaffDetail() {
                 <p className="text-sm text-[#999999]">No goals yet for this staff member.</p>
               ) : (
                 <ul className="space-y-2">
-                  {goals.map(g => (
-                    <li key={g.id} className="flex items-start justify-between gap-3 p-3 bg-gray-50 border border-gray-100 rounded-lg">
-                      <div className="min-w-0">
-                        <p className="font-medium text-[#2c3e7e] truncate">{g.title || 'Untitled goal'}</p>
-                        <p className="text-xs text-[#999999] capitalize">
-                          {g.goal_type?.replace(/_/g, ' ') || 'Goal'}
-                          {g.status === 'completed' && g.final_score != null ? ` · Final score ${g.final_score}` : ''}
-                          {g.approved_at ? ` · Approved ${fmtShort(g.approved_at)}` : ` · Created ${fmtShort(g.created_at)}`}
-                        </p>
+                  {goals.map(g => {
+                    const signable = canEvaluatorSign && g.status !== 'draft'
+                    const expanded = expandedGoalId === g.id
+                    return (
+                    <li key={g.id} className="p-3 bg-gray-50 border border-gray-100 rounded-lg">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium text-[#2c3e7e] truncate">{g.title || 'Untitled goal'}</p>
+                          <p className="text-xs text-[#999999] capitalize">
+                            {g.goal_type?.replace(/_/g, ' ') || 'Goal'}
+                            {g.status === 'completed' && g.final_score != null ? ` · Final score ${g.final_score}` : ''}
+                            {g.approved_at ? ` · Approved ${fmtShort(g.approved_at)}` : ` · Created ${fmtShort(g.created_at)}`}
+                          </p>
+                          <p className="text-[11px] mt-1">
+                            <span className={g.evaluator_signed_at ? 'text-green-700' : 'text-[#999999]'}>
+                              {g.evaluator_signed_at ? `✓ You signed ${fmtShort(g.evaluator_signed_at)}` : 'Evaluator not signed'}
+                            </span>
+                            <span className="text-[#cccccc]"> · </span>
+                            <span className={g.staff_signed_at ? 'text-green-700' : 'text-[#999999]'}>
+                              {g.staff_signed_at ? `Staff signed ${fmtShort(g.staff_signed_at)}` : 'Staff not signed'}
+                            </span>
+                          </p>
+                        </div>
+                        <div className="shrink-0 flex flex-col items-end gap-1">
+                          {goalStatusBadge(g.status)}
+                          {signable && (
+                            <button
+                              onClick={() => setExpandedGoalId(expanded ? null : g.id)}
+                              className="text-xs text-[#477fc1] hover:underline"
+                            >
+                              {expanded ? 'Hide sign-off' : (g.evaluator_signed_at ? 'Manage sign-off' : 'Sign-off')}
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="shrink-0">{goalStatusBadge(g.status)}</div>
+                      {signable && expanded && (
+                        <div className="mt-3">
+                          <SignOffBlock
+                            table="goals"
+                            row={g}
+                            canStaffSign={false}
+                            canEvaluatorSign={true}
+                            onChange={(updated) =>
+                              setGoals(prev => prev.map(x => (x.id === updated.id ? { ...x, ...updated } : x)))
+                            }
+                          />
+                        </div>
+                      )}
                     </li>
-                  ))}
+                    )
+                  })}
                 </ul>
               )}
             </div>
