@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { isEmailDomainAllowed } from '../lib/domainCheck'
 
 export default function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user } = useAuth()
-  
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -53,10 +54,10 @@ export default function Login() {
       return
     }
 
-    // Check if user has a profile
+    // Check if user has a profile (and the tenant's allowed domains)
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id, is_active')
+      .select('id, is_active, tenants(allowed_domains)')
       .eq('id', data.user.id)
       .single()
 
@@ -69,6 +70,13 @@ export default function Login() {
 
     if (!profile.is_active) {
       setError('Your account has been deactivated. Please contact your administrator.')
+      await supabase.auth.signOut()
+      setLoading(false)
+      return
+    }
+
+    if (!isEmailDomainAllowed(data.user.email, profile.tenants?.allowed_domains)) {
+      setError('Your email domain is not authorized to access this system.')
       await supabase.auth.signOut()
       setLoading(false)
       return
@@ -111,7 +119,7 @@ export default function Login() {
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       email.toLowerCase().trim(),
       {
-        redirectTo: `${window.location.origin}/reset-password`
+        redirectTo: `${window.location.origin}/set-password`
       }
     )
 
@@ -245,4 +253,3 @@ export default function Login() {
     </div>
   )
 }
-

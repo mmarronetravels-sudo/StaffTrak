@@ -21,6 +21,7 @@ import MySummative from './pages/MySummative'
 import Reports from './pages/Reports'
 import StaffImport from './pages/StaffImport'
 import AuthCallback from './pages/AuthCallback'
+import SetPassword from './pages/SetPassword'
 import MyChecklist from './pages/MyChecklist'
 import Checklists from './pages/Checklists'
 import Calendar from './pages/Calendar'
@@ -38,35 +39,37 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/set-password" element={<SetPassword />} />
+          <Route path="/reset-password" element={<SetPassword />} />
 
           {/* Protected routes - all authenticated users */}
-          <Route 
-            path="/dashboard" 
+          <Route
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* Goals - all users can view their own */}
-          <Route 
-            path="/goals" 
+          <Route
+            path="/goals"
             element={
               <ProtectedRoute>
                 <Goals />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* My Checklist - all authenticated users (their own cycle) */}
-          <Route 
-            path="/my-checklist" 
+          <Route
+            path="/my-checklist"
             element={
               <ProtectedRoute>
                 <MyChecklist />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* Calendar - all authenticated users (staff see own, evaluators see caseload + can schedule) */}
@@ -86,7 +89,7 @@ function App() {
               <ProtectedRoute>
                 <SelfReflection />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* My Observations - staff view */}
@@ -110,42 +113,42 @@ function App() {
           />
 
           {/* My Meetings - staff view */}
-          <Route 
-            path="/my-meetings" 
+          <Route
+            path="/my-meetings"
             element={
               <ProtectedRoute>
                 <MyMeetings />
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/my-meetings/:id" 
+          <Route
+            path="/my-meetings/:id"
             element={
               <ProtectedRoute>
                 <MeetingSession />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* My Summative - staff view */}
-          <Route 
-            path="/my-summative" 
+          <Route
+            path="/my-summative"
             element={
               <ProtectedRoute>
                 <MySummative />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* Admin + Evaluator routes (is_evaluator flag OR admin role) */}
-          <Route 
-            path="/staff" 
+          <Route
+            path="/staff"
             element={
               <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Staff />
               </ProtectedRoute>
-            } 
+            }
           />
 
           <Route
@@ -166,76 +169,76 @@ function App() {
             }
           />
 
-          <Route 
-            path="/rubrics" 
+          <Route
+            path="/rubrics"
             element={
               <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Rubrics />
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/goal-approvals" 
+          <Route
+            path="/goal-approvals"
             element={
               <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <GoalApprovals />
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/observations" 
+          <Route
+            path="/observations"
             element={
               <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Observations />
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/observations/:id" 
+          <Route
+            path="/observations/:id"
             element={
               <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <ObservationSession />
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/meetings" 
+          <Route
+            path="/meetings"
             element={
               <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Meetings />
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/meetings/:id" 
+          <Route
+            path="/meetings/:id"
             element={
               <ProtectedRoute>
                 <MeetingSession />
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/summatives" 
+          <Route
+            path="/summatives"
             element={
               <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <Summatives />
               </ProtectedRoute>
-            } 
+            }
           />
 
-          <Route 
-            path="/summatives/:staffId" 
+          <Route
+            path="/summatives/:staffId"
             element={
               <ProtectedRoute allowedRoles={['district_admin']} allowEvaluators>
                 <SummativeEvaluation />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* Evaluation Checklists - Admin + Evaluators + HR */}
@@ -259,33 +262,33 @@ function App() {
           />
 
           {/* Reports - Admin + Evaluators + HR */}
-          <Route 
-            path="/reports" 
+          <Route
+            path="/reports"
             element={
               <ProtectedRoute allowedRoles={['district_admin', 'hr']} allowEvaluators>
                 <Reports />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* Leave Tracker - Admin + HR */}
-          <Route 
-            path="/leave-tracker" 
+          <Route
+            path="/leave-tracker"
             element={
               <ProtectedRoute allowedRoles={['district_admin', 'hr']}>
                 <LeaveTracker />
               </ProtectedRoute>
-            } 
+            }
           />
 
           {/* ODE Staff Position - Admin + HR */}
-          <Route 
-            path="/ode-staff-position" 
+          <Route
+            path="/ode-staff-position"
             element={
               <ProtectedRoute allowedRoles={['district_admin', 'hr']}>
                 <ODEStaffPosition />
               </ProtectedRoute>
-            } 
+            }
           />
         </Routes>
       </BrowserRouter>
