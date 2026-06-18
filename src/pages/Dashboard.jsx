@@ -226,13 +226,18 @@ function Dashboard() {
     setLoading(true)
     
     if (isAdmin || isEvaluator) {
-      // Evaluator/Admin stats
-      const { data: assignedStaff } = await supabase
+      // Evaluator/Admin stats.
+      // District/school admins see ALL active staff in the tenant; evaluators
+      // see only their assigned caseload (profiles.evaluator_id = me).
+      let staffQuery = supabase
         .from('profiles')
         .select('id, full_name, position_type, staff_type, email')
-        .eq('evaluator_id', profile.id)
         .eq('is_active', true)
-        .order('full_name')
+        .in('role', ['licensed_staff', 'classified_staff'])
+      staffQuery = isAdmin
+        ? staffQuery.eq('tenant_id', profile.tenant_id)
+        : staffQuery.eq('evaluator_id', profile.id)
+      const { data: assignedStaff } = await staffQuery.order('full_name')
 
       setMyStaff(assignedStaff || [])
 
