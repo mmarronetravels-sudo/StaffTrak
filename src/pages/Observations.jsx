@@ -150,6 +150,40 @@ function Observations() {
     }
   }
 
+  const cancelObservation = async (observation) => {
+    const who = observation.staff?.full_name || 'this staff member'
+    if (!confirm(
+      `Cancel the ${obsTypeLabel(observation.observation_type)} observation for ${who}?\n\n` +
+      `It will be removed from the calendar (including the staff member's Google Calendar). ` +
+      `The record is kept and marked Cancelled.`
+    )) return
+
+    const { error } = await supabase
+      .from('observations')
+      .update({ status: 'cancelled' })
+      .eq('id', observation.id)
+
+    if (error) {
+      alert(`Could not cancel: ${error.message}`)
+      return
+    }
+
+    setObservations(prev =>
+      prev.map(o => (o.id === observation.id ? { ...o, status: 'cancelled' } : o))
+    )
+
+    // Let the staff member know (best-effort; never blocks the cancel).
+    createNotification({
+      userId: observation.staff_id,
+      tenantId: profile.tenant_id,
+      type: 'observation_cancelled',
+      title: 'An observation was cancelled',
+      message: `${profile.full_name || 'Your evaluator'} cancelled the ${obsTypeLabel(observation.observation_type)} observation scheduled for ${formatDate(observation.scheduled_at)}.`,
+      relatedEntityType: 'observation',
+      relatedEntityId: observation.id,
+    })
+  }
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'scheduled':
@@ -363,12 +397,20 @@ function Observations() {
                   </div>
                   <div className="flex gap-2">
                     {observation.status === 'scheduled' && (
-                      <button
-                        onClick={() => startObservation(observation)}
-                        className="bg-[#f3843e] text-white px-4 py-2 rounded-lg hover:bg-[#d9702f]"
-                      >
-                        Start
-                      </button>
+                      <>
+                        <button
+                          onClick={() => startObservation(observation)}
+                          className="bg-[#f3843e] text-white px-4 py-2 rounded-lg hover:bg-[#d9702f]"
+                        >
+                          Start
+                        </button>
+                        <button
+                          onClick={() => cancelObservation(observation)}
+                          className="border border-red-300 text-red-700 px-4 py-2 rounded-lg hover:bg-red-50"
+                        >
+                          Cancel
+                        </button>
+                      </>
                     )}
                     {observation.status === 'in_progress' && (
                       <button
