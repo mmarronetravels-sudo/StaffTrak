@@ -2,28 +2,33 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 // ============================================================
-// gcal-sync — mirror StaffTrak observations/meetings onto each staff
-// member's Google Calendar.
+// gcal-sync — mirror StaffTrak observations/meetings onto Google Calendars.
 // ------------------------------------------------------------
-// Invoked by Supabase DATABASE WEBHOOKS on the `observations` and `meetings`
-// tables (INSERT / UPDATE / DELETE). For each change we create, patch, or
-// delete an event on the staff member's *own* Google Calendar.
+// Invoked by a Postgres row trigger (pg_net) on the `observations` and
+// `meetings` tables (INSERT / UPDATE / DELETE). For each change we create,
+// patch, or delete an event on TWO calendars:
+//   • the staff member's own Google Calendar, and
+//   • the "other" party's calendar — the OBSERVER (observations) or the
+//     EVALUATOR (meetings).  (Added S66.)
 //
 // AUTH MODEL — domain-wide delegation. A Google Cloud service account is granted
 // domain-wide delegation in the Summit Workspace admin console for the single
 // scope https://www.googleapis.com/auth/calendar.events. This function signs a
-// JWT that impersonates the staff member (sub = their @summitlc.org email) and
-// exchanges it for an access token, so the event is created AS the staff member
-// on their primary calendar — no per-user consent prompts.
+// JWT that impersonates each person (sub = their @summitlc.org email) and
+// exchanges it for an access token, so each event is created AS that person on
+// their primary calendar — no per-user consent prompts, no calendar invites.
+// The other-party event is best-effort: if that person is not on a delegated
+// domain (token exchange fails) we log and skip it without failing the staff event.
 //
-// The row->event mapping lives in `gcal_event_links` (migration 035), NOT on the
-// observations/meetings rows — writing back to those rows would re-fire the
-// webhook in a loop.
+// The row->event mapping lives in `gcal_event_links` (035 + 038), NOT on the
+// observations/meetings rows — writing back to those rows would loop the trigger.
+// One link row now holds BOTH event ids: gcal_event_id (staff) and
+// other_gcal_event_id (observer/evaluator).
 //
 // SECRETS (supabase secrets set ...):
 //   GCAL_SA_CLIENT_EMAIL   service account client_email
 //   GCAL_SA_PRIVATE_KEY    service account private key (PEM, keep the \n)
-//   GCAL_WEBHOOK_SECRET    shared secret; must match the webhook's
+//   GCAL_WEBHOOK_SECRET    shared secret; must match the trigger's
 //                          Authorization: Bearer <secret> header
 //   GCAL_TIME_ZONE         (optional) IANA tz, default America/Los_Angeles
 //   GCAL_OBS_MINUTES       (optional) observation duration, default 45
@@ -103,7 +108,7 @@ async function getDelegatedToken(subjectEmail: string): Promise<string> {
   const header = { alg: "RS256", typ: "JWT" }
   const claim = {
     iss: SA_EMAIL,
-    sub: subjectEmail, // impersonate the staff member
+    sub: subjectEmail, // impersonate this person
     scope: SCOPE,
     aud: TOKEN_URL,
     iat: now,
@@ -176,10 +181,52 @@ async function gcalDelete(token: string, eventId: string): Promise<void> {
   }
 }
 
+// Create / patch / recreate one event on one person's calendar.
+async function syncEvent(
+  email: string,
+  existingEventId: string | undefined | null,
+  eventBody: unknown,
+): Promise<{ eventId: string; action: string }> {
+  const token = await getDelegatedToken(email)
+  if (existingEventId) {
+    try {
+      await gcalPatch(token, existingEventId, eventBody)
+      return { eventId: existingEventId, action: "updated" }
+    } catch (e) {
+      if ((e as { code?: number }).code === 404) {
+        const id = await gcalInsert(token, eventBody) // recreate if it vanished
+        return { eventId: id, action: "recreated" }
+      }
+      throw e
+    }
+  }
+  const id = await gcalInsert(token, eventBody)
+  return { eventId: id, action: "created" }
+}
+
+// Best-effort delete; never throws.
+async function safeDelete(email: string | null | undefined, eventId: string | null | undefined) {
+  if (!email || !eventId) return
+  try {
+    const token = await getDelegatedToken(email)
+    await gcalDelete(token, eventId)
+  } catch (e) {
+    console.error("gcal-sync: delete error", (e as Error).message)
+  }
+}
+
 // ── Build the Google event body from a StaffTrak row ──────────────────────
+// audience "staff"  → the event on the staff member's own calendar
+// audience "other"  → the event on the observer/evaluator's calendar
 type Row = Record<string, unknown>
 
-function buildEvent(table: string, row: Row, staffName: string, otherName: string) {
+function buildEvent(
+  table: string,
+  row: Row,
+  audience: "staff" | "other",
+  staffName: string,
+  otherName: string,
+) {
   const startISO = String(row.scheduled_at)
   const start = new Date(startISO)
   const minutes = table === "observations" ? OBS_MINUTES : MEETING_MINUTES
@@ -190,13 +237,26 @@ function buildEvent(table: string, row: Row, staffName: string, otherName: strin
 
   if (table === "observations") {
     const label = obsLabel(row.observation_type as string)
-    summary = `${label} Observation`
-    if (otherName) lines.push(`Observer: ${otherName}`)
+    if (audience === "staff") {
+      summary = `${label} Observation`
+      if (otherName) lines.push(`Observer: ${otherName}`)
+    } else {
+      // Observer's calendar — include who they're observing.
+      summary = staffName ? `${label} Observation — ${staffName}` : `${label} Observation`
+      if (staffName) lines.push(`Staff: ${staffName}`)
+    }
     if (row.subject_topic) lines.push(`Subject/Topic: ${row.subject_topic}`)
     if (row.is_formative_only) lines.push("Formative only — not counted toward the summative score.")
   } else {
-    summary = meetingLabel(row.meeting_type as string)
-    if (otherName) lines.push(`With: ${otherName}`)
+    const label = meetingLabel(row.meeting_type as string)
+    if (audience === "staff") {
+      summary = label
+      if (otherName) lines.push(`With: ${otherName}`)
+    } else {
+      // Evaluator's calendar — include who the meeting is with.
+      summary = staffName ? `${label} — ${staffName}` : label
+      if (staffName) lines.push(`With: ${staffName}`)
+    }
   }
   lines.push("", "Scheduled via StaffTrak.")
 
@@ -251,15 +311,11 @@ serve(async (req) => {
       .eq("source_id", sourceId)
       .maybeSingle()
 
-    // ── DELETE, or the row no longer warrants an event → remove if we have one
+    // ── DELETE, or the row no longer warrants an event → remove BOTH events
     if (type === "DELETE" || !wantsEvent(newRow)) {
       if (existingLink) {
-        try {
-          const token = await getDelegatedToken(existingLink.staff_email)
-          await gcalDelete(token, existingLink.gcal_event_id)
-        } catch (e) {
-          console.error("gcal-sync: delete error", (e as Error).message)
-        }
+        await safeDelete(existingLink.staff_email, existingLink.gcal_event_id)
+        await safeDelete(existingLink.other_email, existingLink.other_gcal_event_id)
         await admin.from("gcal_event_links").delete()
           .eq("source_table", table).eq("source_id", sourceId)
       }
@@ -278,45 +334,109 @@ serve(async (req) => {
     const staff = people?.find((p) => p.id === staffId)
     const other = people?.find((p) => p.id === otherId)
 
-    if (!staff?.email) {
-      console.error("gcal-sync: staff has no email", { staffId })
-      return json({ error: "staff has no email" }, 200) // don't retry-storm
+    if (!staff?.email && !other?.email) {
+      console.error("gcal-sync: neither party has an email", { staffId, otherId })
+      return json({ error: "no addressable calendars" }, 200) // don't retry-storm
     }
 
-    const event = buildEvent(table, row, staff.full_name || "", other?.full_name || "")
-    const token = await getDelegatedToken(staff.email)
+    // Both calendars are INDEPENDENT and BEST-EFFORT: a failure on one party's
+    // calendar (e.g. an unprovisioned / non-delegated mailbox) must never block
+    // the other party's event. We persist the link row if EITHER succeeds, and
+    // only return 500 when BOTH fail.
 
-    let eventId = existingLink?.gcal_event_id as string | undefined
-    let action: string
-    if (eventId) {
+    // 1) Staff member's calendar (best-effort).
+    let staffEmail: string | null = existingLink?.staff_email ?? null
+    let staffEventId: string | null = existingLink?.gcal_event_id ?? null
+    let staffAction = "skipped"
+
+    if (staff?.email) {
       try {
-        await gcalPatch(token, eventId, event)
-        action = "updated"
+        if (staffEventId && staffEmail && staffEmail !== staff.email) {
+          await safeDelete(staffEmail, staffEventId)
+          staffEventId = null
+        }
+        const staffEvent = buildEvent(table, row, "staff", staff.full_name || "", other?.full_name || "")
+        const r = await syncEvent(staff.email, staffEventId, staffEvent)
+        staffEventId = r.eventId
+        staffEmail = staff.email
+        staffAction = r.action
       } catch (e) {
-        if ((e as { code?: number }).code === 404) {
-          eventId = await gcalInsert(token, event) // recreate if it vanished
-          action = "recreated"
-        } else throw e
+        console.error("gcal-sync: staff-calendar error", (e as Error).message)
+        staffAction = "error"
       }
-    } else {
-      eventId = await gcalInsert(token, event)
-      action = "created"
+    } else if (staffEventId && staffEmail) {
+      await safeDelete(staffEmail, staffEventId)
+      staffEmail = null
+      staffEventId = null
+      staffAction = "deleted_staff"
+    }
+
+    // 2) Observer/Evaluator's calendar (best-effort).
+    let otherEmail: string | null = existingLink?.other_email ?? null
+    let otherEventId: string | null = existingLink?.other_gcal_event_id ?? null
+    let otherAction = "skipped"
+
+    if (other?.email) {
+      try {
+        // Reassigned to a different person → remove the stale event first.
+        if (otherEventId && otherEmail && otherEmail !== other.email) {
+          await safeDelete(otherEmail, otherEventId)
+          otherEventId = null
+        }
+        const otherEvent = buildEvent(table, row, "other", staff?.full_name || "", other.full_name || "")
+        const r = await syncEvent(other.email, otherEventId, otherEvent)
+        otherEventId = r.eventId
+        otherEmail = other.email
+        otherAction = r.action
+      } catch (e) {
+        // Don't fail the whole sync if the other party isn't reachable
+        // (e.g. not on a delegated domain). Keep any prior link values.
+        console.error("gcal-sync: other-calendar error", (e as Error).message)
+        otherAction = "error"
+      }
+    } else if (otherEventId && otherEmail) {
+      // The other party was cleared → remove their stale event.
+      await safeDelete(otherEmail, otherEventId)
+      otherEmail = null
+      otherEventId = null
+      otherAction = "deleted_other"
+    }
+
+    const staffOk = !!staffEventId
+    const otherOk = !!otherEventId
+
+    // If neither calendar ended up with an event, drop any stale link and 500
+    // so the failure is visible in logs (and pg_net can be inspected).
+    if (!staffOk && !otherOk) {
+      if (existingLink) {
+        await admin.from("gcal_event_links").delete()
+          .eq("source_table", table).eq("source_id", sourceId)
+      }
+      console.error("gcal-sync: both calendars failed", { sourceId, staffAction, otherAction })
+      return json({ error: "both calendars failed", staffAction, otherAction }, 500)
     }
 
     await admin.from("gcal_event_links").upsert({
       source_table: table,
       source_id: sourceId,
-      tenant_id: (row.tenant_id as string | undefined) ?? (staff as Row).tenant_id ?? null,
+      tenant_id: (row.tenant_id as string | undefined) ??
+        (staff as Row | undefined)?.tenant_id ?? (other as Row | undefined)?.tenant_id ?? null,
       staff_id: staffId,
-      staff_email: staff.email,
-      gcal_event_id: eventId,
+      staff_email: staffEmail,
+      gcal_event_id: staffEventId,
       gcal_calendar_id: "primary",
+      other_id: other?.id ?? null,
+      other_email: otherEmail,
+      other_gcal_event_id: otherEventId,
       last_synced_at: new Date().toISOString(),
-      last_status: action,
+      last_status: `staff:${staffAction}|other:${otherAction}`,
     }, { onConflict: "source_table,source_id" })
 
-    console.log(JSON.stringify({ action, table, sourceId, staff: staff.email }))
-    return json({ ok: true, action, eventId })
+    console.log(JSON.stringify({
+      table, sourceId, staff: staffEmail, staffAction,
+      other: otherEmail, otherAction,
+    }))
+    return json({ ok: true, staffAction, otherAction })
   } catch (e) {
     console.error("gcal-sync: unhandled", (e as Error).message)
     return json({ error: (e as Error).message }, 500)
