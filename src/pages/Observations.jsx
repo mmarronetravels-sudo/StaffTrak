@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { notifyObservationScheduled } from '../services/emailService'
 import { createNotification } from '../services/notificationService'
+import { pacificInputToUTC } from '../lib/timezone'
 import Navbar from '../components/Navbar'
 import {
   OBSERVATION_TYPES,
@@ -84,7 +85,7 @@ function Observations() {
         staff_id: newObservation.staff_id,
         observation_type: newObservation.observation_type,
         is_formative_only: newObservation.is_formative_only,
-        scheduled_at: newObservation.scheduled_at,
+        scheduled_at: pacificInputToUTC(newObservation.scheduled_at),
         location: newObservation.location,
         subject_topic: newObservation.subject_topic,
         status: 'scheduled'

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { notifyObservationScheduled } from '../services/emailService'
+import { pacificInputToUTC } from '../lib/timezone'
 import Navbar from '../components/Navbar'
 import {
   OBSERVATION_TYPES,
@@ -94,7 +95,7 @@ export default function Calendar() {
     const [{ data: obs }, { data: meet }] = await Promise.all([obsQuery, meetQuery])
 
     const normalized = [
-      ...(obs || []).filter(o => o.scheduled_at).map(o => ({
+      ...(obs || []).filter(o => o.scheduled_at && o.status !== 'cancelled').map(o => ({
         id: `obs-${o.id}`,
         kind: 'observation',
         type: o.observation_type,
@@ -104,7 +105,7 @@ export default function Calendar() {
         status: o.status,
         detail: o.subject_topic || o.location || '',
       })),
-      ...(meet || []).filter(m => m.scheduled_at).map(m => ({
+      ...(meet || []).filter(m => m.scheduled_at && m.status !== 'cancelled').map(m => ({
         id: `meet-${m.id}`,
         kind: 'meeting',
         type: 'meeting',
@@ -154,7 +155,7 @@ export default function Calendar() {
         staff_id: form.staff_id,
         observation_type: form.observation_type,
         is_formative_only: form.is_formative_only,
-        scheduled_at: form.scheduled_at,
+        scheduled_at: pacificInputToUTC(form.scheduled_at),
         location: form.location,
         subject_topic: form.subject_topic,
         status: 'scheduled',

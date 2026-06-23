@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { createNotification } from '../services/notificationService'
+import { pacificInputToUTC } from '../lib/timezone'
 import Navbar from '../components/Navbar'
 
 function Meetings() {
@@ -67,7 +68,7 @@ function Meetings() {
         staff_id: newMeeting.staff_id,
         evaluator_id: profile.id,
         meeting_type: newMeeting.meeting_type,
-        scheduled_at: newMeeting.scheduled_at,
+        scheduled_at: pacificInputToUTC(newMeeting.scheduled_at),
         location: newMeeting.location,
         agenda: newMeeting.agenda,
         status: 'scheduled'
