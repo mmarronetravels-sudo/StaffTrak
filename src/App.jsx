@@ -19,6 +19,7 @@ import Summatives from './pages/Summatives'
 import SummativeEvaluation from './pages/SummativeEvaluation'
 import MySummative from './pages/MySummative'
 import Reports from './pages/Reports'
+import EvaluatorSnapshot from './pages/EvaluatorSnapshot'
 import StaffImport from './pages/StaffImport'
 import AuthCallback from './pages/AuthCallback'
 import SetPassword from './pages/SetPassword'
@@ -258,6 +259,16 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['district_admin', 'hr']} allowEvaluators>
                 <Evidence />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Evaluator Snapshot - Admin + Evaluators + HR */}
+          <Route
+            path="/snapshot"
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'hr']} allowEvaluators>
+                <EvaluatorSnapshot />
               </ProtectedRoute>
             }
           />

@@ -233,6 +233,20 @@ export default function Navbar() {
               />
             )}
 
+            {/* Snapshot — admin/evaluator */}
+            {isAdminOrEvaluator && (
+              <Link
+                to="/snapshot"
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  isActive('/snapshot')
+                    ? 'bg-white/20 text-white'
+                    : 'text-blue-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                📍 Snapshot
+              </Link>
+            )}
+
             {/* Reports — admin/evaluator */}
             {isAdminOrEvaluator && (
               <Link
@@ -421,6 +435,15 @@ export default function Navbar() {
                   <span className="mr-2">{link.icon}</span>{link.label}
                 </Link>
               ))}
+              <Link
+                to="/snapshot"
+                onClick={() => setMobileOpen(false)}
+                className={`block px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                  isActive('/snapshot') ? 'bg-white/20 text-white' : 'text-blue-200 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <span className="mr-2">📍</span>Snapshot
+              </Link>
               <Link
                 to="/reports"
                 onClick={() => setMobileOpen(false)}
