@@ -94,6 +94,32 @@ function Reports() {
     window.location.href = '/login'
   }
 
+  // Derive the active school year from today's date.
+  // A school year runs Aug–Jun; we roll over to the next one in July so the
+  // report advances automatically (no hardcoded year to maintain each fall).
+  const getSchoolYear = (today = new Date()) => {
+    const ROLLOVER_MONTH = 6 // 0-indexed: July
+    const y = today.getFullYear()
+    const startYear = today.getMonth() >= ROLLOVER_MONTH ? y : y - 1
+    const endYear = startYear + 1
+    return {
+      startYear,
+      endYear,
+      label: `${startYear}-${endYear}`,
+      deadlines: {
+        selfReflection: new Date(startYear, 9, 15), // Oct 15
+        goals: new Date(startYear, 9, 15),          // Oct 15
+        initialMeeting: new Date(startYear, 9, 31), // Oct 31
+        midYear: new Date(endYear, 0, 30),          // Jan 30
+        observations: new Date(endYear, 4, 1),      // May 1
+        endOfYear: new Date(endYear, 4, 30),        // May 30
+        summative: new Date(endYear, 5, 5),         // Jun 5
+      },
+    }
+  }
+
+  const schoolYear = getSchoolYear()
+
   // Calculate workflow status for each staff member
   const getStaffWorkflowStatus = (staffMember) => {
     const staffGoals = data.goals.filter(g => g.staff_id === staffMember.id)
@@ -102,12 +128,12 @@ function Reports() {
     const staffEval = data.evaluations.find(e => e.staff_id === staffMember.id)
     const staffMeetings = data.meetings.filter(m => m.staff_id === staffMember.id)
 
-    // Define workflow steps with deadlines (using school year 2025-2026)
+    // Define workflow steps with deadlines (derived from the active school year)
     const today = new Date()
     const steps = []
 
     // Step 1: Self-Reflection (Due Oct 15)
-    const selfReflectionDue = new Date('2025-10-15')
+    const selfReflectionDue = schoolYear.deadlines.selfReflection
     steps.push({
       name: 'Self-Reflection',
       due: selfReflectionDue,
@@ -116,7 +142,7 @@ function Reports() {
     })
 
     // Step 2: Goals Submitted (Due Oct 15)
-    const goalsDue = new Date('2025-10-15')
+    const goalsDue = schoolYear.deadlines.goals
     const approvedGoals = staffGoals.filter(g => g.status === 'approved')
     const requiredGoals = staffMember.staff_type === 'licensed' ? 3 : 3 // 2 SLGs + 1 PGG or 1 PPG + 2 Improvement
     steps.push({
@@ -128,7 +154,7 @@ function Reports() {
     })
 
     // Step 3: Initial Goals Meeting (Due Oct 31)
-    const initialMeetingDue = new Date('2025-10-31')
+    const initialMeetingDue = schoolYear.deadlines.initialMeeting
     const initialMeeting = staffMeetings.find(m => m.meeting_type === 'initial_goals' && m.status === 'completed')
     steps.push({
       name: 'Initial Goals Meeting',
@@ -138,7 +164,7 @@ function Reports() {
     })
 
     // Step 4: Mid-Year Review (Due Jan 30)
-    const midYearDue = new Date('2026-01-30')
+    const midYearDue = schoolYear.deadlines.midYear
     const midYearMeeting = staffMeetings.find(m => m.meeting_type === 'mid_year_review' && m.status === 'completed')
     steps.push({
       name: 'Mid-Year Review',
@@ -152,7 +178,7 @@ function Reports() {
     const requiredObs = staffMember.staff_type === 'licensed' ? 
       (staffMember.years_at_school <= 3 ? 3 : 3) : 0 // Probationary vs Permanent
     if (requiredObs > 0) {
-      const obsDue = new Date('2026-05-01')
+      const obsDue = schoolYear.deadlines.observations
       steps.push({
         name: 'Observations',
         due: obsDue,
@@ -163,7 +189,7 @@ function Reports() {
     }
 
     // Step 6: End of Year Review (Due May 30)
-    const endYearDue = new Date('2026-05-30')
+    const endYearDue = schoolYear.deadlines.endOfYear
     const endYearMeeting = staffMeetings.find(m => m.meeting_type === 'end_of_year_review' && m.status === 'completed')
     steps.push({
       name: 'End-of-Year Review',
@@ -173,7 +199,7 @@ function Reports() {
     })
 
     // Step 7: Summative Evaluation (Due June 5)
-    const summativeDue = new Date('2026-06-05')
+    const summativeDue = schoolYear.deadlines.summative
     steps.push({
       name: 'Summative Evaluation',
       due: summativeDue,
@@ -351,7 +377,7 @@ function Reports() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-[#2c3e7e]">Reports & Analytics</h2>
-          <p className="text-[#666666]">School Year 2025-2026</p>
+          <p className="text-[#666666]">School Year {schoolYear.label}</p>
         </div>
 
         {/* Tab Navigation */}
