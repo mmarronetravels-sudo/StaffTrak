@@ -3,6 +3,12 @@ import { supabase } from '../supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import NeedsAttentionPanel from '../components/NeedsAttentionPanel'
+import {
+  effectiveEmploymentStatus,
+  employmentStatusLabel,
+  employmentStatusBadgeClass,
+  setEmploymentStatus,
+} from '../lib/employmentStatus'
 
 function Dashboard() {
   const { user, profile, signOut, isAdmin, isEvaluator, isStaff } = useAuth()
@@ -231,7 +237,7 @@ function Dashboard() {
       // see only their assigned caseload (profiles.evaluator_id = me).
       let staffQuery = supabase
         .from('profiles')
-        .select('id, full_name, position_type, staff_type, email')
+        .select('id, full_name, position_type, staff_type, email, employment_status, hire_date')
         .eq('is_active', true)
         .in('role', ['licensed_staff', 'classified_staff'])
       staffQuery = isAdmin
@@ -313,6 +319,21 @@ function Dashboard() {
   const handleLogout = async () => {
     await signOut()
     window.location.href = '/login'
+  }
+
+  // Set/clear a staff member's probationary|permanent override.
+  // Empty value clears the override and falls back to the hire-date rule.
+  const handleEmploymentStatusChange = async (staffId, value) => {
+    const newStatus = value === '' ? null : value
+    const previous = myStaff
+    setMyStaff(curr =>
+      curr.map(s => (s.id === staffId ? { ...s, employment_status: newStatus } : s))
+    )
+    const { error } = await setEmploymentStatus(supabase, staffId, newStatus)
+    if (error) {
+      setMyStaff(previous)
+      alert('Could not update status: ' + error.message)
+    }
   }
 
   // Get evaluation cycle progress for staff
@@ -596,21 +617,41 @@ function Dashboard() {
               <p className="text-sm text-[#999999]">No staff are currently assigned to you.</p>
             ) : (
               <div className="space-y-2">
-                {myStaff.map(s => (
-                  <a
-                    key={s.id}
-                    href={`/staff/${s.id}`}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium text-[#2c3e7e]">{s.full_name}</p>
-                      <p className="text-sm text-[#666666] capitalize">
-                        {s.position_type?.replace(/_/g, ' ') || (s.staff_type === 'licensed' ? 'Licensed staff' : 'Classified staff')}
-                      </p>
+                {myStaff.map(s => {
+                  const status = effectiveEmploymentStatus(s)
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <a href={`/staff/${s.id}`} className="flex-1 min-w-0">
+                        <p className="font-medium text-[#2c3e7e]">{s.full_name}</p>
+                        <p className="text-sm text-[#666666] capitalize">
+                          {s.position_type?.replace(/_/g, ' ') || (s.staff_type === 'licensed' ? 'Licensed staff' : 'Classified staff')}
+                        </p>
+                      </a>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${employmentStatusBadgeClass(status)}`}
+                          title={s.employment_status ? 'Set manually' : 'Based on hire date'}
+                        >
+                          {employmentStatusLabel(status)}
+                        </span>
+                        <select
+                          value={s.employment_status || ''}
+                          onChange={e => handleEmploymentStatusChange(s.id, e.target.value)}
+                          className="text-xs border border-gray-200 rounded px-1 py-1 text-[#666666] bg-white"
+                          title="Set probationary/permanent (overrides the hire-date default)"
+                        >
+                          <option value="">Auto (by hire date)</option>
+                          <option value="probationary">Probationary</option>
+                          <option value="permanent">Permanent</option>
+                        </select>
+                        <a href={`/staff/${s.id}`} className="text-[#477fc1] text-sm">View →</a>
+                      </div>
                     </div>
-                    <span className="text-[#477fc1] text-sm">View →</span>
-                  </a>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
