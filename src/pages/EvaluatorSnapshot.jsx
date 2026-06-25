@@ -244,7 +244,10 @@ function EvaluatorSnapshot() {
     return { count: visible.length, perm, prob, avg: n ? Math.round(sumPct / n) : null, attn }
   }, [visible, sy, today])
 
-  const toggle = (id) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
+  // expanded[id] holds the selected phase key, or '__all__' for the full
+  // breakdown. Clicking the same target again collapses it.
+  const toggle = (id, key = '__all__') =>
+    setExpanded(prev => ({ ...prev, [id]: prev[id] === key ? undefined : key }))
 
   const otClass = (pct) => pct === null ? 'text-gray-400'
     : pct >= 80 ? 'text-green-600' : pct >= 60 ? 'text-amber-600' : 'text-red-600'
@@ -365,7 +368,7 @@ function EvaluatorSnapshot() {
                       <FragmentRow
                         key={r.id}
                         r={r} pct={pct} curIdx={curIdx} sy={sy} today={today}
-                        expanded={!!expanded[r.id]} onToggle={() => toggle(r.id)}
+                        sel={expanded[r.id]} onToggle={(key) => toggle(r.id, key)}
                         otClass={otClass} fmt={fmt}
                       />
                     )
@@ -396,11 +399,16 @@ function EvaluatorSnapshot() {
   )
 }
 
-function FragmentRow({ r, pct, curIdx, sy, today, expanded, onToggle, otClass, fmt }) {
+function FragmentRow({ r, pct, curIdx, sy, today, sel, onToggle, otClass, fmt }) {
+  const detailPhases = sel === '__all__' ? PHASES : PHASES.filter(p => p.key === sel)
   return (
     <>
-      <tr className="hover:bg-gray-50 cursor-pointer" onClick={onToggle}>
-        <td className="px-4 py-2.5 font-medium text-[#2c3e7e] whitespace-nowrap sticky left-0 bg-white">
+      <tr className="hover:bg-gray-50">
+        <td
+          onClick={() => onToggle('__all__')}
+          title="Show full breakdown"
+          className={`px-4 py-2.5 font-medium text-[#2c3e7e] whitespace-nowrap sticky left-0 bg-white cursor-pointer ${sel === '__all__' ? 'bg-[#eef2ff]' : ''}`}
+        >
           {r.name}
           <span className={`ml-2 align-middle text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
             r.track === 'probationary' ? 'bg-amber-100 text-amber-800'
@@ -413,9 +421,15 @@ function FragmentRow({ r, pct, curIdx, sy, today, expanded, onToggle, otClass, f
           const st = phaseState(p, r.counts, sy, today)
           const txt = p.isObs ? `${st.done}/${st.total}`
             : st.status === 'done' ? '✓' : st.done > 0 ? `${st.done}/${st.total}` : ''
+          const isSel = sel === p.key
           return (
-            <td key={p.key} className={`px-2 py-2.5 text-center ${i === curIdx ? 'bg-[#f7f9ff]' : ''}`}>
-              <span className={`inline-flex items-center justify-center min-w-[34px] h-6 px-2 rounded-md font-bold text-xs ${CELL[st.status]}`}>
+            <td
+              key={p.key}
+              onClick={() => onToggle(p.key)}
+              title={`${p.label} — click for detail`}
+              className={`px-2 py-2.5 text-center cursor-pointer ${i === curIdx ? 'bg-[#f7f9ff]' : ''} ${isSel ? 'bg-[#eef2ff]' : ''}`}
+            >
+              <span className={`inline-flex items-center justify-center min-w-[34px] h-6 px-2 rounded-md font-bold text-xs ${CELL[st.status]} ${isSel ? 'ring-2 ring-[#2c3e7e]' : ''}`}>
                 {txt}
               </span>
             </td>
@@ -425,11 +439,19 @@ function FragmentRow({ r, pct, curIdx, sy, today, expanded, onToggle, otClass, f
           <span className={`font-extrabold ${otClass(pct)}`}>{pct === null ? '—' : `${pct}%`}</span>
         </td>
       </tr>
-      {expanded && (
+      {sel && (
         <tr className="bg-[#fafbfd]">
           <td colSpan={PHASES.length + 2} className="px-4 py-3">
+            {sel !== '__all__' && (
+              <button
+                onClick={() => onToggle('__all__')}
+                className="mb-2 text-[11px] font-semibold text-[#2c3e7e] hover:underline"
+              >
+                Show all steps →
+              </button>
+            )}
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {PHASES.map(p => {
+              {detailPhases.map(p => {
                 const st = phaseState(p, r.counts, sy, today)
                 let d
                 if (p.key === 'self_goals') d = `${r.counts.self_reflection_done ? 'Self-reflection submitted' : 'Self-reflection not submitted'} · ${r.counts.goals_approved >= 3 ? '3+ goals approved' : `${r.counts.goals_approved}/3 goals approved`}`
