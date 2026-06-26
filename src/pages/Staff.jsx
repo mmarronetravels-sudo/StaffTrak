@@ -26,7 +26,8 @@ function Staff() {
     staff_type: 'licensed',
     hire_date: '',
     years_at_school: 1,
-    evaluator_id: ''
+    evaluator_id: '',
+    is_evaluator: false
   })
 
   useEffect(() => {
@@ -154,6 +155,7 @@ function Staff() {
         hire_date: selectedStaff.hire_date,
         years_at_school: selectedStaff.years_at_school,
         evaluator_id: selectedStaff.evaluator_id || null,
+        is_evaluator: selectedStaff.is_evaluator === true,
         assigned_rubric_id: selectedStaff.assigned_rubric_id || null,
         is_active: selectedStaff.is_active
       })
@@ -179,7 +181,8 @@ function Staff() {
       staff_type: 'licensed',
       hire_date: '',
       years_at_school: 1,
-      evaluator_id: ''
+      evaluator_id: '',
+      is_evaluator: false
     })
   }
 
@@ -633,6 +636,18 @@ function Staff() {
                       ))}
                     </select>
                   </div>
+
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newStaff.is_evaluator === true}
+                        onChange={(e) => setNewStaff({...newStaff, is_evaluator: e.target.checked})}
+                        className="w-4 h-4 text-[#2c3e7e] rounded focus:ring-[#477fc1]"
+                      />
+                      <span className="text-sm text-[#666666]">Is Evaluator (can evaluate assigned staff)</span>
+                    </label>
+                  </div>
                 </div>
 
                 <div className="flex gap-3 mt-6">
@@ -960,6 +975,18 @@ function Staff() {
                     <p className="text-xs text-[#666666] mt-1">
                       Leave blank to auto-select by position type. Pick a rubric here to override.
                     </p>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedStaff.is_evaluator === true}
+                        onChange={(e) => setSelectedStaff({...selectedStaff, is_evaluator: e.target.checked})}
+                        className="w-4 h-4 text-[#2c3e7e] rounded focus:ring-[#477fc1]"
+                      />
+                      <span className="text-sm text-[#666666]">Is Evaluator (can evaluate assigned staff)</span>
+                    </label>
                   </div>
 
                   <div>
